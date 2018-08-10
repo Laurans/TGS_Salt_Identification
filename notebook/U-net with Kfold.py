@@ -63,7 +63,7 @@ path_test = '../data/test/'
 train_ids = next(os.walk(path_train+"images"))[2]
 test_ids = next(os.walk(path_test+'images'))[2]
 
-def cov_to_class(val):    
+def cov_to_class(val):
     for i in range(0, 11):
         if val * 10 <= i :
             return i
@@ -82,13 +82,13 @@ for n, id_ in enumerate(tqdm(train_ids)):
     x = img_to_array(img)
     x = resize(x, (128, 128, 1), mode='constant', preserve_range=True)
     X_train[n] = x
-    
+
     mask = img_to_array(load_img(path + '/masks/' + id_, color_mode = "grayscale"))
     Y_train[n] = resize(mask, (128, 128, 1), mode='constant', preserve_range=True)
-    
+
     coverage[n, 0] = (mask / 255).sum() / img_size_ori**2
     coverage[n, 1] = cov_to_class(coverage[n, 0])
-    
+
 print('Done!')
 
 
@@ -155,12 +155,12 @@ def create_model():
     model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
     return model
 
-def fit(model, X_train, Y_train, output_name):
+def fit(model, X_train, Y_train, x_valid, y_valid, output_name):
     earlystopper = EarlyStopping(patience=10, verbose=0)
     checkpointer = ModelCheckpoint('{}.h5'.format(output_name), verbose=0, save_best_only=True)
     reduce_lr = ReduceLROnPlateau(factor=0.1, patience=5, min_lr=0.00001, verbose=0)
-    
-    results = model.fit(X_train, Y_train, validation_data=[x_valid, y_valid], batch_size=128, epochs=100, 
+
+    results = model.fit(X_train, Y_train, validation_data=[x_valid, y_valid], batch_size=128, epochs=100,
                         callbacks=[earlystopper, checkpointer, reduce_lr], verbose=0)
     return results
 
@@ -176,7 +176,7 @@ def downsample(img):
 def filtering_regional_maxima(img):
     image = img_as_float(img)
     image = ndimage.gaussian_filter(image, 1)
-    
+
     seed = np.copy(image)
     seed[1:-1, 1:-1] = image.min()
     mask = image
@@ -193,12 +193,12 @@ def elastic_transform(image, alpha, sigma, seed=None):
        Proc. of the International Conference on Document Analysis and
        Recognition, 2003.
     """
-    
+
     if seed is None:
         random_state = np.random.RandomState()
     else:
         random_state = np.random.RandomState(seed=seed)
-    
+
     shape = image.shape
     dx = gaussian_filter((random_state.rand(*shape) * 2 - 1), sigma, mode="constant", cval=0) * alpha
     dy = gaussian_filter((random_state.rand(*shape) * 2 - 1), sigma, mode="constant", cval=0) * alpha
@@ -212,7 +212,7 @@ def elastic_transform(image, alpha, sigma, seed=None):
 def iou_metric(y_true_in, y_pred_in, print_table=False):
     labels = y_true_in
     y_pred = y_pred_in
-    
+
     true_objects = 2
     pred_objects = 2
 
@@ -257,7 +257,7 @@ def iou_metric(y_true_in, y_pred_in, print_table=False):
         if print_table:
             print("{:1.3f}\t{}\t{}\t{}\t{:1.3f}".format(t, tp, fp, fn, p))
         prec.append(p)
-    
+
     if print_table:
         print("AP\t-\t-\t-\t{:1.3f}".format(np.mean(prec)))
     return np.mean(prec)
@@ -279,9 +279,9 @@ def augment_images(x_train, y_train):
     y_train_ = np.vstack([y_train_, y_train.copy()])
     print('Global equalize done')
 
-    x_train_ = np.append(x_train_, np.array([np.expand_dims(elastic_transform(x.squeeze(), 20, 4, 20), -1) 
+    x_train_ = np.append(x_train_, np.array([np.expand_dims(elastic_transform(x.squeeze(), 20, 4, 20), -1)
                                   for x in tqdm(x_train)]), 0)
-    y_train_ = np.append(y_train_, np.array([np.expand_dims(elastic_transform(x.squeeze(), 20, 4, 20), -1) 
+    y_train_ = np.append(y_train_, np.array([np.expand_dims(elastic_transform(x.squeeze(), 20, 4, 20), -1)
                                   for x in tqdm(y_train)]), 0)
 
     print('Elastic transform done')
@@ -295,11 +295,11 @@ ious_by_split = []
 thresholds_by_split = []
 
 
-for i in range(3):
+for i in range(5):
     print('-'*5,'Start FOLD', i, '-'*5)
     x_train, x_valid, y_train, y_valid, cov_train, cov_valid = train_test_split(
-        X_train, Y_train, coverage, test_size=0.1, stratify=coverage[:, 1], random_state=1337)
-    
+        X_train, Y_train, coverage, test_size=0.2, stratify=coverage[:, 1])
+
     ## Data augmentation
     x_train = np.append(x_train, np.array( [np.fliplr(x) for x in x_train]), 0)
     y_train = np.append(y_train, np.array( [np.fliplr(x) for x in y_train]), 0)
@@ -307,14 +307,14 @@ for i in range(3):
     print(x_train.shape)
 
     x_train_, y_train_ = augment_images(x_train, y_train)
-    
+
     y_train_ = np.piecewise(y_train_, [y_train_ > 125, y_train_ < 125], [1, 0])
 
     y_valid = np.piecewise(y_valid, [y_valid > 125, y_valid < 125], [1, 0])
 
     ## Create model
     amodel = create_model()
-    history = fit(amodel, x_train_, y_train_, 'model_split_{}'.format(i))
+    history = fit(amodel, x_train_, y_train_, x_valid, y_valid, 'model_split_{}'.format(i))
 
     model = load_model('model_split_{}.h5'.format(i))
 
@@ -326,10 +326,10 @@ for i in range(3):
     threshold_best_index = np.argmax(ious[9:-10]) + 9
     iou_best = ious[threshold_best_index]
     threshold_best = thresholds[threshold_best_index]
-    
+
     ious_by_split.append(iou_best)
     thresholds_by_split.append(threshold_best)
-    
+
 pickle.dump([ious_by_split, thresholds_by_split], open('ious_thres.pkl', 'wb'))
 
 
@@ -339,5 +339,3 @@ pickle.dump([ious_by_split, thresholds_by_split], open('ious_thres.pkl', 'wb'))
 
 
 print("Threshold ", np.mean(thresholds_by_split), 'Ious', np.mean(ious_by_split))
-
-

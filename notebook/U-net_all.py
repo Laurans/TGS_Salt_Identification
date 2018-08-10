@@ -157,11 +157,11 @@ def create_model():
 
 def fit(model, X_train, Y_train, output_name):
     earlystopper = EarlyStopping(patience=10, verbose=0)
-    checkpointer = ModelCheckpoint('{}.h5'.format(output_name), verbose=0, save_best_only=True)
+    checkpointer = ModelCheckpoint('{}.h5'.format(output_name), verbose=1, save_best_only=F)
     reduce_lr = ReduceLROnPlateau(factor=0.1, patience=5, min_lr=0.00001, verbose=0)
 
-    results = model.fit(X_train, Y_train, validation_data=[x_valid, y_valid], batch_size=128, epochs=100,
-                        callbacks=[earlystopper, checkpointer, reduce_lr], verbose=0)
+    results = model.fit(X_train, Y_train, batch_size=128, epochs=30,
+                        callbacks=[earlystopper, checkpointer, reduce_lr], verbose=1)
     return results
 
 
@@ -302,16 +302,14 @@ x_train_, y_train_ = augment_images(x_train, y_train)
 
 y_train_ = np.piecewise(y_train_, [y_train_ > 125, y_train_ < 125], [1, 0])
 
-y_valid = np.piecewise(y_valid, [y_valid > 125, y_valid < 125], [1, 0])
-
 ## Create model
 amodel = create_model()
-history = fit(amodel, x_train_, y_train_, 'model_all'.format(i))
+history = fit(amodel, x_train_, y_train_, 'model_all')
 
-model = load_model('model_all.h5'.format(i))
+model = load_model('model_all.h5')
 
 
-threshold_best = 0.6802721088435374
+threshold_best = 0.6244 #0.6802721088435374
 
 ##
 print('Load test')
