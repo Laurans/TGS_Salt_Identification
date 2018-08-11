@@ -6,6 +6,8 @@ import numpy as np
 import os
 from keras.preprocessing.image import ImageDataGenerator, array_to_img, img_to_array, load_img
 
+from data_augmentation import global_equalize
+
 def cov_to_class(val):
     for i in range(0, 11):
         if val * 10 <= i :
@@ -37,7 +39,7 @@ class DataManager:
             img = load_img(self.path_train + '/images/' + id_, color_mode = "grayscale")
             x = img_to_array(img)
             x = resize(x, (128, 128, 1), mode='constant', preserve_range=True)
-            X_train[n] = x
+            X_train[n] = global_equalize(x)
 
             mask = img_to_array(load_img(self.path_train + '/masks/' + id_, color_mode = "grayscale"))
             Y_train[n] = resize(mask, (128, 128, 1), mode='constant', preserve_range=True)
