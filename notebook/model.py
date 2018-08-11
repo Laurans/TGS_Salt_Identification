@@ -3,7 +3,7 @@ warnings.filterwarnings("ignore")
 
 import tensorflow as tf
 from keras.models import Model, load_model
-from keras.layers import Input, Dropout, BatchNormalization, PReLU
+from keras.layers import Input, Dropout, BatchNormalization, PReLU, ReLU
 from keras.layers.core import Lambda
 from keras.layers.convolutional import Conv2D, Conv2DTranspose
 from keras.layers.pooling import MaxPooling2D
@@ -20,6 +20,7 @@ def create_model(im_height, im_width, im_chan):
     b0 = BatchNormalization()(s)
     c0 = Conv2D(8, (3, 3), activation=None, padding='same') (b0)
     c0 = PReLU()(c0)
+    c1 = BatchNormalization()(c0)
     c0 = Conv2D(8, (3, 3), activation=None, padding='same') (c0)
     c0 = PReLU()(c0)
     p0 = MaxPooling2D((2, 2)) (c0)
@@ -27,6 +28,7 @@ def create_model(im_height, im_width, im_chan):
     b1 = BatchNormalization()(p0)
     c1 = Conv2D(16, (3, 3), activation=None, padding='same') (b1)
     c1 = PReLU()(c1)
+    c1 = BatchNormalization()(c1)
     c1 = Conv2D(16, (3, 3), activation=None, padding='same') (c1)
     c1 = PReLU()(c1)
     p1 = MaxPooling2D((2, 2)) (c1)
@@ -35,6 +37,7 @@ def create_model(im_height, im_width, im_chan):
     b2 = BatchNormalization()(p1)
     c2 = Conv2D(32, (3, 3), activation=None, padding='same') (b2)
     c2 = PReLU()(c2)
+    c2 = BatchNormalization()(c2)
     c2 = Conv2D(32, (3, 3), activation=None, padding='same') (c2)
     c2 = PReLU()(c2)
     p2 = MaxPooling2D((2, 2)) (c2)
@@ -43,6 +46,7 @@ def create_model(im_height, im_width, im_chan):
     b3 = BatchNormalization()(p2)
     c3 = Conv2D(64, (3, 3), activation=None, padding='same') (b3)
     c3 = PReLU()(c3)
+    c3 = BatchNormalization()(c3)
     c3 = Conv2D(64, (3, 3), activation=None, padding='same') (c3)
     c3 = PReLU()(c3)
     p3 = MaxPooling2D((2, 2)) (c3)
@@ -51,6 +55,7 @@ def create_model(im_height, im_width, im_chan):
     b4 = BatchNormalization()(p3)
     c4 = Conv2D(128, (3, 3), activation=None, padding='same') (b4)
     c4 = PReLU()(c4)
+    c4 = BatchNormalization()(c4)
     c4 = Conv2D(128, (3, 3), activation=None, padding='same') (c4)
     c4 = PReLU()(c4)
     p4 = MaxPooling2D(pool_size=(2, 2)) (c4)
@@ -59,6 +64,7 @@ def create_model(im_height, im_width, im_chan):
     b5 = BatchNormalization()(p4)
     c5 = Conv2D(256, (3, 3), activation=None, padding='same') (b5)
     c5 = PReLU()(c5)
+    c5 = BatchNormalization()(c5)
     c5 = Conv2D(256, (3, 3), activation=None, padding='same') (c5)
     c5 = PReLU()(c5)
 
@@ -68,6 +74,7 @@ def create_model(im_height, im_width, im_chan):
     #u6 = Dropout(0.5)(u6)
     c6 = Conv2D(128, (3, 3), activation=None, padding='same') (u6)
     c6 = PReLU()(c6)
+    c6 = BatchNormalization()(c6)
     c6 = Conv2D(128, (3, 3), activation=None, padding='same') (c6)
     c6 = PReLU()(c6)
 
@@ -77,6 +84,7 @@ def create_model(im_height, im_width, im_chan):
     #u7 = Dropout(0.5)(u7)
     c7 = Conv2D(64, (3, 3), activation=None, padding='same') (u7)
     c7 = PReLU()(c7)
+    c7 = BatchNormalization()(c7)
     c7 = Conv2D(64, (3, 3), activation=None, padding='same') (c7)
     c7 = PReLU()(c7)
 
@@ -86,6 +94,7 @@ def create_model(im_height, im_width, im_chan):
     #u8 = Dropout(0.5)(u8)
     c8 = Conv2D(32, (3, 3), activation=None, padding='same') (u8)
     c8 = PReLU()(c8)
+    c8 = BatchNormalization()(c8)
     c8 = Conv2D(32, (3, 3), activation=None, padding='same') (c8)
     c8 = PReLU()(c8)
 
@@ -95,6 +104,7 @@ def create_model(im_height, im_width, im_chan):
     #u9 = Dropout(0.5)(u9)
     c9 = Conv2D(16, (3, 3), activation=None, padding='same') (u9)
     c9 = PReLU()(c9)
+    c9 = BatchNormalization()(c9)
     c9 = Conv2D(16, (3, 3), activation=None, padding='same') (c9)
     c9 = PReLU()(c9)
 
@@ -104,6 +114,7 @@ def create_model(im_height, im_width, im_chan):
     #u9 = Dropout(0.5)(u9)
     c10 = Conv2D(8, (3, 3), activation=None, padding='same') (u10)
     c10 = PReLU()(c10)
+    c10 = BatchNormalization()(c10)
     c10 = Conv2D(8, (3, 3), activation=None, padding='same') (c10)
     c10 = PReLU()(c10)
 
@@ -118,6 +129,6 @@ def fit(model, X_train, Y_train, x_valid, y_valid, output_name):
     checkpointer = ModelCheckpoint('{}.h5'.format(output_name), verbose=0, save_best_only=True)
     reduce_lr = ReduceLROnPlateau(factor=0.1, patience=5, min_lr=0.00001, verbose=0)
 
-    results = model.fit(X_train, Y_train, validation_data=[x_valid, y_valid], batch_size=128, epochs=100,
+    results = model.fit(X_train, Y_train, validation_data=[x_valid, y_valid], batch_size=128, epochs=50,
                         callbacks=[checkpointer, reduce_lr], verbose=1)
     return results
