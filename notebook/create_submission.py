@@ -3,10 +3,12 @@ from data_augmentation import *
 from metrics import *
 from model import *
 import pandas as pd
+from keras.applications.vgg16 import VGG16, preprocess_input
+from model import mean_iou
 
 datamanager = DataManager()
 
-model = load_model('model_testing_script_0.h5')
+model = load_model('model.h5', custom_objects={'mean_iou': mean_iou})
 
 X_test = datamanager.load_test()
 

@@ -8,6 +8,7 @@ from skimage.morphology import reconstruction, disk
 from skimage.filters import rank
 
 from skimage.morphology import label
+from keras.applications.vgg16 import preprocess_input
 
 import cv2
 import numpy as np
@@ -49,25 +50,13 @@ def elastic_transform(image, alpha, sigma, seed=None):
 
     return map_coordinates(image, indices, order=1).reshape(shape)
 
+def process_input(X):
+    print('Process input for vgg16')
+    return np.array( [preprocess_input(x) for x in X])
 
 def augment_images(x_train, y_train):
-    x_train = np.append(x_train, np.array( [np.fliplr(x) for x in x_train]), 0)
-    y_train = np.append(y_train, np.array( [np.fliplr(x) for x in y_train]), 0)
-
-    x_train_ = np.append(x_train, np.array( [filtering_regional_maxima(x) for x in tqdm(x_train)]), 0)
-    y_train_ = np.vstack([y_train, y_train.copy()])
-
-    #x_train_ = np.append(x_train_, np.array([global_equalize(x) for x in tqdm(x_train)]), 0)
-    #y_train_ = np.vstack([y_train_, y_train.copy()])
-
-    x_train_ = np.append(x_train_, np.array([np.expand_dims(elastic_transform(x.squeeze(), 8, 4), -1) for x in tqdm(x_train)]), 0)
-    y_train_ = np.append(y_train_, np.array([np.expand_dims(elastic_transform(x.squeeze(), 8, 4), -1) for x in tqdm(y_train)]), 0)
-
-    x_train_ = np.append(x_train_, np.array([np.expand_dims(elastic_transform(x.squeeze(), 20, 4), -1) for x in tqdm(x_train)]), 0)
-    y_train_ = np.append(y_train_, np.array([np.expand_dims(elastic_transform(x.squeeze(), 20, 4), -1) for x in tqdm(y_train)]), 0)
-
-    x_train_ = np.append(x_train_, np.array([np.expand_dims(elastic_transform(x.squeeze(), 31, 4), -1) for x in tqdm(x_train)]), 0)
-    y_train_ = np.append(y_train_, np.array([np.expand_dims(elastic_transform(x.squeeze(), 31, 4), -1) for x in tqdm(y_train)]), 0)
-
     print('Augment images done')
-    return x_train_, y_train_
+
+
+    #x_train = process_input(x_train)
+    return x_train, y_train
