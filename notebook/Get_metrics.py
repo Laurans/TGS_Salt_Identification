@@ -8,7 +8,6 @@ from sklearn.model_selection import train_test_split
 datamanager = DataManager()
 
 X_train, Y_train, coverage = datamanager.load_train()
-
 ious_by_split = []
 thresholds_by_split = []
 
@@ -28,7 +27,7 @@ for i in range(1):
     amodel = create_model(datamanager.im_height, datamanager.im_width, datamanager.im_chan)
     history = fit(amodel, x_train_, y_train_, x_valid, y_valid, 'model_testing_script_{}'.format(i))
 
-    """
+
     model = load_model('model_testing_script_{}.h5'.format(i))
 
 
@@ -43,4 +42,3 @@ for i in range(1):
     threshold_best = thresholds[threshold_best_index]
 
     print("Threshold ", threshold_best, 'Ious', iou_best)
-    """

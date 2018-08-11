@@ -54,16 +54,20 @@ def augment_images(x_train, y_train):
     x_train = np.append(x_train, np.array( [np.fliplr(x) for x in x_train]), 0)
     y_train = np.append(y_train, np.array( [np.fliplr(x) for x in y_train]), 0)
 
-    #x_train_ = np.append(x_train, np.array( [filtering_regional_maxima(x) for x in tqdm(x_train)]), 0)
-    #y_train_ = np.vstack([y_train, y_train.copy()])
+    x_train_ = np.append(x_train, np.array( [filtering_regional_maxima(x) for x in tqdm(x_train)]), 0)
+    y_train_ = np.vstack([y_train, y_train.copy()])
 
     #x_train_ = np.append(x_train_, np.array([global_equalize(x) for x in tqdm(x_train)]), 0)
     #y_train_ = np.vstack([y_train_, y_train.copy()])
 
-    #x_train_ = np.append(x_train_, np.array([np.expand_dims(elastic_transform(x.squeeze(), 20, 4, 20), -1)
-    #                              for x in tqdm(x_train)]), 0)
-    #y_train_ = np.append(y_train_, np.array([np.expand_dims(elastic_transform(x.squeeze(), 20, 4, 20), -1)
-    #                              for x in tqdm(y_train)]), 0)
-    x_train_ , y_train_ = x_train, y_train
+    x_train_ = np.append(x_train_, np.array([np.expand_dims(elastic_transform(x.squeeze(), 8, 4), -1) for x in tqdm(x_train)]), 0)
+    y_train_ = np.append(y_train_, np.array([np.expand_dims(elastic_transform(x.squeeze(), 8, 4), -1) for x in tqdm(y_train)]), 0)
+
+    x_train_ = np.append(x_train_, np.array([np.expand_dims(elastic_transform(x.squeeze(), 20, 4), -1) for x in tqdm(x_train)]), 0)
+    y_train_ = np.append(y_train_, np.array([np.expand_dims(elastic_transform(x.squeeze(), 20, 4), -1) for x in tqdm(y_train)]), 0)
+
+    x_train_ = np.append(x_train_, np.array([np.expand_dims(elastic_transform(x.squeeze(), 31, 4), -1) for x in tqdm(x_train)]), 0)
+    y_train_ = np.append(y_train_, np.array([np.expand_dims(elastic_transform(x.squeeze(), 31, 4), -1) for x in tqdm(y_train)]), 0)
+
     print('Augment images done')
     return x_train_, y_train_

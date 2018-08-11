@@ -20,7 +20,6 @@ def create_model(im_height, im_width, im_chan):
     b0 = BatchNormalization()(s)
     c0 = Conv2D(8, (3, 3), activation=None, padding='same') (b0)
     c0 = PReLU()(c0)
-    c1 = BatchNormalization()(c0)
     c0 = Conv2D(8, (3, 3), activation=None, padding='same') (c0)
     c0 = PReLU()(c0)
     p0 = MaxPooling2D((2, 2)) (c0)
@@ -125,10 +124,10 @@ def create_model(im_height, im_width, im_chan):
     return model
 
 def fit(model, X_train, Y_train, x_valid, y_valid, output_name):
-    #earlystopper = EarlyStopping(patience=10, verbose=1)
+    earlystopper = EarlyStopping(patience=10, verbose=1)
     checkpointer = ModelCheckpoint('{}.h5'.format(output_name), verbose=0, save_best_only=True)
     reduce_lr = ReduceLROnPlateau(factor=0.1, patience=5, min_lr=0.00001, verbose=0)
 
-    results = model.fit(X_train, Y_train, validation_data=[x_valid, y_valid], batch_size=128, epochs=50,
-                        callbacks=[checkpointer, reduce_lr], verbose=1)
+    results = model.fit(X_train, Y_train, validation_data=[x_valid, y_valid], batch_size=128, epochs=100,
+                        callbacks=[checkpointer, reduce_lr, earlystopper], verbose=1)
     return results

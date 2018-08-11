@@ -52,7 +52,7 @@ class DataManager:
         return X_train, Y_train, coverage
 
     def load_test(self):
-        X_test = np.zeros((len(test_ids), im_height, im_width, im_chan), dtype=np.uint8)
+        X_test = np.zeros((len(self.test_ids), self.im_height, self.im_width, self.im_chan), dtype=np.uint8)
 
         sizes_test = []
         print('Getting and resizing test images ... ')
@@ -62,9 +62,10 @@ class DataManager:
             x = img_to_array(img)[:,:,1]
             sizes_test.append([x.shape[0], x.shape[1]])
             x = resize(x, (128, 128, 1), mode='constant', preserve_range=True)
-            X_test[n] = x
+            X_test[n] = global_equalize(x)
 
         print('Done!')
+        return X_test
 
     def downsample(self, list_img):
         def process_img(img):
