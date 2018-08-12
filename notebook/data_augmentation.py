@@ -13,50 +13,94 @@ from keras.applications.vgg16 import preprocess_input
 import cv2
 import numpy as np
 
-from tqdm import tqdm
+from tqdm import tqdm, trange
+import sys
 
-def filtering_regional_maxima(img):
-    image = img_as_float(img)
-    image = ndimage.gaussian_filter(image, 1)
+affine_seq = iaa.Sequential([
+    # General
+    iaa.SomeOf((1, 2),
+               [iaa.Fliplr(0.5),
+                iaa.Affine(rotate=(-10, 10),
+                           translate_percent={"x": (-0.25, 0.25)}, mode='symmetric'),
+                ]),
+    # Deformations
+    iaa.Sometimes(0.3, iaa.PiecewiseAffine(scale=(0.04, 0.08))),
+    iaa.Sometimes(0.3, iaa.PerspectiveTransform(scale=(0.05, 0.1))),
+], random_order=True)
 
-    seed = np.copy(image)
-    seed[1:-1, 1:-1] = image.min()
-    mask = image
-    dilated = reconstruction(seed, mask, method='dilation') * 255
-    return np.array(dilated, dtype=np.uint8)
-
-def global_equalize(img):
-    return np.array(exposure.equalize_hist(img) * 255, dtype=np.uint8)
-
-def elastic_transform(image, alpha, sigma, seed=None):
-    """Elastic deformation of images as described in [Simard2003]_.
-    .. [Simard2003] Simard, Steinkraus and Platt, "Best Practices for
-       Convolutional Neural Networks applied to Visual Document Analysis", in
-       Proc. of the International Conference on Document Analysis and
-       Recognition, 2003.
-    """
-
-    if seed is None:
-        random_state = np.random.RandomState()
-    else:
-        random_state = np.random.RandomState(seed=seed)
-
-    shape = image.shape
-    dx = gaussian_filter((random_state.rand(*shape) * 2 - 1), sigma, mode="constant", cval=0) * alpha
-    dy = gaussian_filter((random_state.rand(*shape) * 2 - 1), sigma, mode="constant", cval=0) * alpha
-
-    x, y = np.meshgrid(np.arange(shape[0]), np.arange(shape[1]))
-    indices = np.reshape(y+dy, (-1, 1)), np.reshape(x+dx, (-1, 1))
-
-    return map_coordinates(image, indices, order=1).reshape(shape)
-
-def process_input(X):
-    print('Process input for vgg16')
-    return np.array( [preprocess_input(x) for x in X])
+intensity_seq = iaa.Sequential([
+    iaa.Invert(0.3),
+    iaa.Sometimes(0.3, iaa.ContrastNormalization((0.5, 1.5))),
+    iaa.OneOf([
+        iaa.Noop(),
+        iaa.Sequential([
+            iaa.OneOf([
+                iaa.Add((-10, 10)),
+                iaa.AddElementwise((-10, 10)),
+                iaa.Multiply((0.95, 1.05)),
+                iaa.MultiplyElementwise((0.95, 1.05)),
+            ]),
+        ]),
+        iaa.OneOf([
+            iaa.GaussianBlur(sigma=(0.0, 1.0)),
+            iaa.AverageBlur(k=(2, 5)),
+            iaa.MedianBlur(k=(3, 5))
+        ])
+    ])
+], random_order=False)
 
 def augment_images(x_train, y_train):
+
+    AUG_NR = 6
+
+    all_x = []
+    all_y = []
+
+    sys.stdout.flush()
+    for _ in trange(AUG_NR, desc='AUG NR'):
+        aug_imgs = []
+        labels_imgs = []
+        for i in trange(x_train.shape[0], desc='aug each images'):
+            augmentor = affine_seq.to_deterministic()
+            aug_img = augmentor.augment_image(x_train[i])
+            label_img = augmentor.augment_image(y_train[i])
+            aug_imgs.append(aug_img)
+            labels_imgs.append(label_img)
+
+        all_x.append(np.array(aug_imgs))
+        all_y.append(np.array(labels_imgs))
+
+    for _ in trange(AUG_NR, desc='AUG NR'):
+        aug_imgs = []
+        labels_imgs = []
+        for i in trange(x_train.shape[0], desc='aug each images'):
+            augmentor = affine_seq.to_deterministic()
+            aug_img = intensity_seq.augment_image(augmentor.augment_image(x_train[i]))
+            label_img = augmentor.augment_image(y_train[i])
+            aug_imgs.append(aug_img)
+            labels_imgs.append(label_img)
+
+        all_x.append(np.array(aug_imgs))
+        all_y.append(np.array(labels_imgs))
+
+    x_train_ = np.vstack(all_x)
+    y_train_ = np.vstack(all_y)
+
     print('Augment images done')
+    return x_train_, y_train_
 
 
-    #x_train = process_input(x_train)
-    return x_train, y_train
+def plot_list(images=[], labels=[]):
+    n_img = len(images)
+    n_lab = len(labels)
+    n = n_lab + n_img
+    fig, axs = plt.subplots(1, n, figsize=(16, 12))
+    for i, image in enumerate(images):
+        axs[i].imshow(image)
+        axs[i].set_xticks([])
+        axs[i].set_yticks([])
+    for j, label in enumerate(labels):
+        axs[n_img + j].imshow(label, cmap='nipy_spectral')
+        axs[n_img + j].set_xticks([])
+        axs[n_img + j].set_yticks([])
+    plt.show()

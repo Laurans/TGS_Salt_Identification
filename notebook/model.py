@@ -8,7 +8,7 @@ from keras.layers.core import Lambda
 from keras.layers.convolutional import Conv2D, Conv2DTranspose
 from keras.layers.pooling import MaxPooling2D
 from keras.layers.merge import concatenate
-from keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau
+from keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau, CSVLogger
 from keras import backend as K
 from keras.applications.vgg16 import VGG16, preprocess_input
 
@@ -115,15 +115,18 @@ def create_model(im_height, im_width, im_chan):
 
 
 def fit(model, X_train, Y_train, x_valid, y_valid, output_name):
-    earlystopper = EarlyStopping(patience=10, verbose=1)
-    checkpointer = ModelCheckpoint('{}.h5'.format(output_name), verbose=0, save_best_only=True)
+    earlystopper = EarlyStopping(patience=5, verbose=1)
+    checkpointer = ModelCheckpoint(output_name, monitor='val_mean_iou', mode='max', verbose=0, save_best_only=True)
     reduce_lr = ReduceLROnPlateau(factor=0.1, patience=5, min_lr=0.00001, verbose=0)
+    csvlog = CSVLogger('{}_log.csv'.format(output_name.split('.')[0]))
 
-    results = model.fit(X_train, Y_train, validation_data=[x_valid, y_valid], batch_size=32, epochs=100,
-                        callbacks=[checkpointer, reduce_lr, earlystopper], verbose=1)
+    results = model.fit(X_train, Y_train, validation_data=[x_valid, y_valid], batch_size=64, epochs=100,
+                        callbacks=[checkpointer, reduce_lr, earlystopper, csvlog], verbose=1)
     return results
 
 """
 to test : https://github.com/nicolov/segmentation_keras/blob/master/model.py
 to test : https://github.com/ternaus/TernausNet
+to test : https://github.com/neptune-ml/open-solution-salt-detection/blob/master/src/unet_models.py
+
 """

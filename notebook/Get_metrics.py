@@ -25,21 +25,17 @@ y_valid = np.piecewise(y_valid, [y_valid > 125, y_valid < 125], [1, 0])
 
 amodel = create_model(datamanager.im_height, datamanager.im_width, datamanager.im_chan)
 
-history = fit(amodel, x_train_, y_train_, x_valid, y_valid, 'model')
+history = fit(amodel, x_train_, y_train_, x_valid, y_valid, 'model.h5')
 
-"""
-model = load_model('model_{}.h5'.format(i))
+model = load_model('model.h5', custom_objects={'mean_iou': mean_iou})
 
-
-preds_valid = model.predict(x_valid).reshape(-1,
-                                             datamanager.im_height, datamanager.im_width)
+preds_valid = model.predict(x_valid, verbose=1)
 
 thresholds = np.linspace(0, 1, 50)
-ious = np.array([iou_metric_batch(y_valid, np.int32(preds_valid > threshold)) for threshold in tqdm(thresholds)])
+ious = np.array([iou_metric_batch(y_valid, np.int32(preds_valid > threshold)) for threshold in tqdm(thresholds, desc='compute ious for thres')])
 
 threshold_best_index = np.argmax(ious[9:-10]) + 9
 iou_best = ious[threshold_best_index]
 threshold_best = thresholds[threshold_best_index]
 
 print("Threshold ", threshold_best, 'Ious', iou_best)
-"""
