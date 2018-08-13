@@ -115,12 +115,12 @@ def create_model(im_height, im_width, im_chan):
 
 
 def fit(model, X_train, Y_train, x_valid, y_valid, output_name):
-    earlystopper = EarlyStopping(patience=5, verbose=1, monitor='val_mean_iou', mode='max')
+    earlystopper = EarlyStopping(patience=10, verbose=1) #monitor='val_mean_iou', mode='max')
     checkpointer = ModelCheckpoint(output_name, monitor='val_mean_iou', mode='max', verbose=0, save_best_only=True)
     reduce_lr = ReduceLROnPlateau(factor=0.1, patience=5, min_lr=0.00001, verbose=0)
     csvlog = CSVLogger('{}_log.csv'.format(output_name.split('.')[0]))
 
-    results = model.fit(X_train, Y_train, validation_data=[x_valid, y_valid], batch_size=64, epochs=100,
+    results = model.fit(X_train, Y_train, validation_data=[x_valid, y_valid], batch_size=64, epochs=50,
                         callbacks=[checkpointer, reduce_lr, earlystopper, csvlog], verbose=1)
     return results
 
