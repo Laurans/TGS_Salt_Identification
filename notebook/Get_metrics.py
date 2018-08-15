@@ -2,33 +2,24 @@ from data_io import *
 from data_augmentation import *
 from metrics import *
 from model import *
-
+import joblib
 from sklearn.model_selection import train_test_split
+import datetime
 
 datamanager = DataManager()
 
-X_train, Y_train, coverage = datamanager.load_train()
-ious_by_split = []
-thresholds_by_split = []
-
-seeds = [24, 42, 1997, 63]
-
-x_train, x_valid, y_train, y_valid, cov_train, cov_valid = train_test_split(
-    X_train, Y_train, coverage, test_size=0.2, stratify=coverage[:, 1], random_state=seeds[0])
-
-x_train_, y_train_ = augment_images(x_train, y_train)
-
-y_train_ = np.piecewise(y_train_, [y_train_ > 125, y_train_ < 125], [1, 0])
-
-y_valid = np.piecewise(y_valid, [y_valid > 125, y_valid < 125], [1, 0])
-
+print('Loading dataset')
+start_time = datetime.datetime.now()
+(x_train, y_train), (x_valid, y_valid) = datamanager.load_dataset()
+time_delta = datetime.datetime.now() - start_time
+print('Loading time', time_delta)
 
 amodel = create_model(datamanager.im_height, datamanager.im_width, datamanager.im_chan)
+amodel.load_weights('model.h5')
 
-history = fit(amodel, x_train_, y_train_, x_valid, y_valid, 'model.h5')
+history = fit(amodel, x_train, y_train, x_valid, y_valid, 'model.h5')
 
-model = load_model('model.h5', custom_objects={'mean_iou': mean_iou})
-
+model = load_model('model.h5', custom_objects={'mean_iou': mean_iou, 'mixed_dice_bce_loss': mixed_dice_bce_loss, 'multiclass_dice_loss': multiclass_dice_loss})
 preds_valid = model.predict(x_valid, verbose=1)
 
 thresholds = np.linspace(0, 1, 50)
