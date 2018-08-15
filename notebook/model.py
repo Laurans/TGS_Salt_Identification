@@ -11,8 +11,19 @@ from keras.layers.merge import concatenate
 from keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau, CSVLogger
 from keras import backend as K
 from keras.applications.vgg16 import VGG16, preprocess_input
+from keras.losses import binary_crossentropy
 
 import numpy as np
+
+
+def multiclass_dice_loss(output, target):
+    return 1 - (2* K.sum(output*target)) / (K.sum(output) + K.sum(target) + 1e-7)
+
+def mixed_dice_bce_loss(y_true, y_pred, dice_weight=0.5, bce_weight=1.0):
+    bce_loss = binary_crossentropy(y_true=y_true, y_pred=y_pred)
+    dice_loss = multiclass_dice_loss(y_pred, y_true)
+    return dice_weight*dice_loss+bce_weight*bce_loss
+
 
 def mean_iou(y_true, y_pred):
     prec = []
@@ -29,99 +40,106 @@ def create_model(im_height, im_width, im_chan):
     inputs = Input((im_height, im_width, im_chan))
     s = Lambda(lambda x: x/255)(inputs)
 
-    base_model =  VGG16(include_top=False)
+    x = Conv2D(64, (3, 3), activation=None, padding='same', name='block1_conv1') (s)
+    x = BatchNormalization() (x)
+    x = ReLU()(x)
+    x = Conv2D(64, (3, 3), activation=None, padding='same', name='block1_conv2') (x)
+    x = BatchNormalization() (x)
+    c1 = ReLU()(x)
+    p1 = MaxPooling2D((2, 2), name='block1_pool') (c1)
 
-    b1 = BatchNormalization() (s)
-    c1 = Conv2D(64, (3, 3), activation=None, padding='same') (b1)
-    c1 = ReLU()(c1)
-    c1 = Conv2D(64, (3, 3), activation=None, padding='same') (c1)
-    c1 = ReLU()(c1)
-    p1 = MaxPooling2D((2, 2)) (c1)
-
-    b2 = BatchNormalization() (p1)
-    c2 = Conv2D(128, (3, 3), activation=None, padding='same') (b2)
-    c2 = ReLU()(c2)
-    c2 = Conv2D(128, (3, 3), activation=None, padding='same') (c2)
-    c2 = ReLU()(c2)
+    x = Conv2D(128, (3, 3), activation=None, padding='same', name='block2_conv1') (p1)
+    x = BatchNormalization()(x)
+    x = ReLU()(x)
+    x = Conv2D(128, (3, 3), activation=None, padding='same', name='block2_conv2') (x)
+    x = BatchNormalization()(x)
+    c2 = ReLU()(x)
     p2 = MaxPooling2D((2, 2)) (c2)
 
-    b3 = BatchNormalization() (p2)
-    c3 = Conv2D(256, (3, 3), activation=None, padding='same') (b3)
-    c3 = ReLU()(c3)
-    c3 = Conv2D(256, (3, 3), activation=None, padding='same') (c3)
-    c3 = ReLU()(c3)
-    c3 = Conv2D(256, (3, 3), activation=None, padding='same') (c3)
-    c3 = ReLU()(c3)
+    x = Conv2D(256, (3, 3), activation=None, padding='same', name='block3_conv1') (p2)
+    x = BatchNormalization()(x)
+    x = ReLU()(x)
+    x = Conv2D(256, (3, 3), activation=None, padding='same', name='block3_conv2') (x)
+    x = BatchNormalization()(x)
+    x = ReLU()(x)
+    x = Conv2D(256, (3, 3), activation=None, padding='same', name='block3_conv3') (x)
+    x = BatchNormalization()(x)
+    c3 = ReLU()(x)
     p3 = MaxPooling2D((2, 2)) (c3)
 
-    b4 = BatchNormalization() (p3)
-    c4 = Conv2D(512, (3, 3), activation=None, padding='same') (b4)
-    c4 = ReLU()(c4)
-    c4 = Conv2D(512, (3, 3), activation=None, padding='same') (c4)
-    c4 = ReLU()(c4)
-    c4 = Conv2D(512, (3, 3), activation=None, padding='same') (c4)
-    c4 = ReLU()(c4)
+    x = Conv2D(512, (3, 3), activation=None, padding='same',  name='block4_conv1') (p3)
+    x = BatchNormalization() (x)
+    x = ReLU()(x)
+    x = Conv2D(512, (3, 3), activation=None, padding='same',  name='block4_conv2') (x)
+    x = BatchNormalization() (x)
+    x = ReLU()(x)
+    x = Conv2D(512, (3, 3), activation=None, padding='same',  name='block4_conv3') (x)
+    x = BatchNormalization() (x)
+    c4 = ReLU()(x)
     p4 = MaxPooling2D((2, 2)) (c4)
 
-    b5 = BatchNormalization() (p4)
-    c5 = Conv2D(512, (3, 3), activation=None, padding='same') (b5)
-    c5 = ReLU()(c5)
-    c5 = Conv2D(512, (3, 3), activation=None, padding='same') (c5)
-    c5 = ReLU()(c5)
-    c5 = Conv2D(512, (3, 3), activation=None, padding='same') (c5)
-    c5 = ReLU()(c5)
+    x = Conv2D(512, (3, 3), activation=None, padding='same', name='block5_conv1') (p4)
+    x = BatchNormalization()(x)
+    x = ReLU()(x)
+    x = Conv2D(512, (3, 3), activation=None, padding='same', name='block5_conv2') (x)
+    x = BatchNormalization()(x)
+    x = ReLU()(x)
+    x = Conv2D(512, (3, 3), activation=None, padding='same', name='block5_conv3') (x)
+    x = BatchNormalization()(x)
+    c5 = ReLU()(x)
 
-    b6 = BatchNormalization() (c5)
-    u6 = Conv2DTranspose(512, (2, 2), strides=(2, 2), padding='same') (b6)
-    u6 = concatenate([u6, c4])
-    b6 = BatchNormalization() (u6)
-    c6 = Conv2D(512, (3, 3), activation=None, padding='same') (b6)
-    c6 = ReLU()(c6)
-    c6 = Conv2D(512, (3, 3), activation=None, padding='same') (c6)
-    c6 = ReLU()(c6)
+    u6 = Conv2DTranspose(512, (2, 2), strides=(2, 2), padding='same') (c5)
+    x = concatenate([u6, c4])
+    x = Conv2D(512, (3, 3), activation=None, padding='same') (x)
+    x = BatchNormalization() (x)
+    x = ReLU()(x)
+    x = Conv2D(512, (3, 3), activation=None, padding='same') (x)
+    x = BatchNormalization()(x)
+    c6 = ReLU()(x)
 
-    b7 = BatchNormalization() (c6)
-    u7 = Conv2DTranspose(256, (2, 2), strides=(2, 2), padding='same') (b7)
-    u7 = concatenate([u7, c3])
-    b7 = BatchNormalization() (u7)
-    c7 = Conv2D(256, (3, 3), activation=None, padding='same') (b7)
-    c7 = ReLU()(c7)
-    c7 = Conv2D(256, (3, 3), activation=None, padding='same') (c7)
-    c7 = ReLU()(c7)
+    u7 = Conv2DTranspose(256, (2, 2), strides=(2, 2), padding='same') (c6)
+    x = concatenate([u7, c3])
+    x = Conv2D(256, (3, 3), activation=None, padding='same') (x)
+    x = BatchNormalization() (x)
+    x = ReLU()(x)
+    x = Conv2D(256, (3, 3), activation=None, padding='same') (x)
+    x = BatchNormalization()(x)
+    c7 = ReLU()(x)
 
-    b8 = BatchNormalization() (c7)
-    u8 = Conv2DTranspose(128, (2, 2), strides=(2, 2), padding='same') (b8)
-    u8 = concatenate([u8, c2])
-    b8 = BatchNormalization() (u8)
-    c8 = Conv2D(128, (3, 3), activation=None, padding='same') (b8)
-    c8 = ReLU()(c8)
-    c8 = Conv2D(128, (3, 3), activation=None, padding='same') (c8)
-    c8 = ReLU()(c8)
+    u8 = Conv2DTranspose(128, (2, 2), strides=(2, 2), padding='same') (c7)
+    x = concatenate([u8, c2])
+    x = Conv2D(128, (3, 3), activation=None, padding='same') (x)
+    x = BatchNormalization() (x)
+    x = ReLU()(x)
+    x = Conv2D(128, (3, 3), activation=None, padding='same') (x)
+    x = BatchNormalization()(x)
+    c8 = ReLU()(x)
 
-    b9 = BatchNormalization() (c8)
-    u9 = Conv2DTranspose(64, (2, 2), strides=(2, 2), padding='same') (b9)
-    u9 = concatenate([u9, c1], axis=3)
-    b9 = BatchNormalization() (u9)
-    c9 = Conv2D(64, (3, 3), activation=None, padding='same') (b9)
-    c9 = ReLU()(c9)
-    c9 = Conv2D(64, (3, 3), activation=None, padding='same') (c9)
-    c9 = ReLU()(c9)
+    u9 = Conv2DTranspose(64, (2, 2), strides=(2, 2), padding='same') (c8)
+    x = concatenate([u9, c1], axis=3)
+    x = Conv2D(64, (3, 3), activation=None, padding='same') (x)
+    x = BatchNormalization() (x)
+    x = ReLU()(x)
+    x = Conv2D(64, (3, 3), activation=None, padding='same') (x)
+    x = BatchNormalization()(x)
+    c9 = ReLU()(x)
 
     outputs = Conv2D(1, (1, 1), activation='sigmoid') (c9)
+    outputs = Dropout(0.1)(outputs)
 
     model = Model(inputs=[inputs], outputs=[outputs])
-    model.compile(optimizer='adam', loss='binary_crossentropy', metrics=[mean_iou])
+    model.compile(optimizer='adam', loss=mixed_dice_bce_loss, metrics=[mean_iou])
     return model
 
 
 def fit(model, X_train, Y_train, x_valid, y_valid, output_name):
-    earlystopper = EarlyStopping(patience=10, verbose=1) #monitor='val_mean_iou', mode='max')
+    earlystopper = EarlyStopping(patience=10, verbose=1)
     checkpointer = ModelCheckpoint(output_name, monitor='val_mean_iou', mode='max', verbose=0, save_best_only=True)
     reduce_lr = ReduceLROnPlateau(factor=0.1, patience=5, min_lr=0.00001, verbose=0)
     csvlog = CSVLogger('{}_log.csv'.format(output_name.split('.')[0]))
 
-    results = model.fit(X_train, Y_train, validation_data=[x_valid, y_valid], batch_size=64, epochs=50,
-                        callbacks=[checkpointer, reduce_lr, earlystopper, csvlog], verbose=1)
+    results = model.fit(X_train, Y_train, validation_data=[x_valid, y_valid], batch_size=32, epochs=25,
+                        callbacks=[checkpointer, reduce_lr, csvlog], verbose=1)
     return results
 
 """
