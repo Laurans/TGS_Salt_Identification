@@ -5,6 +5,7 @@ from tqdm import tqdm
 import numpy as np
 import os
 from keras.preprocessing.image import ImageDataGenerator, array_to_img, img_to_array, load_img
+import joblib
 
 def cov_to_class(val):
     for i in range(0, 11):
@@ -70,6 +71,12 @@ class DataManager:
             return resize(img, (self.img_size_ori, self.img_size_ori), mode='constant', preserve_range=True)
 
         return [np.squeeze(process_img(x)) for x in list_img]
+
+    def save_dataset(self, obj):
+        joblib.dump(obj, "../data/generated/dataset.bz2")
+
+    def load_dataset(self):
+        return joblib.load('../data/generated/dataset.bz2')
 
 
 def RLenc(img, order='F', format=True):
