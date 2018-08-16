@@ -12,6 +12,7 @@ from keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau, C
 from keras import backend as K
 from keras.applications.vgg16 import VGG16, preprocess_input
 from keras.losses import binary_crossentropy
+from keras.optimizers import Adam
 from keras import regularizers
 import numpy as np
 
@@ -44,6 +45,7 @@ def create_model(im_height, im_width, im_chan):
     x = BatchNormalization() (x)
     x = PReLU()(x)
     x = Conv2D(16, (5, 5), activation=None, padding='same', name='block1_conv2', kernel_regularizer=regularizers.l2(0.0001)) (x)
+    x = Dropout(0.1)(x)
     x = BatchNormalization() (x)
     x = PReLU()(x)
     c1 = concatenate([s, x])
@@ -52,6 +54,7 @@ def create_model(im_height, im_width, im_chan):
     x = Conv2D(32, (5, 5), activation=None, padding='same', name='block2_conv1', kernel_regularizer=regularizers.l2(0.0001)) (p1)
     x = BatchNormalization()(x)
     x = PReLU()(x)
+    x = Dropout(0.1)(x)
     x = Conv2D(32, (5, 5), activation=None, padding='same', name='block2_conv2', kernel_regularizer=regularizers.l2(0.0001)) (x)
     x = BatchNormalization()(x)
     x = PReLU()(x)
@@ -61,9 +64,11 @@ def create_model(im_height, im_width, im_chan):
     x = Conv2D(64, (5, 5), activation=None, padding='same', name='block3_conv1', kernel_regularizer=regularizers.l2(0.0001)) (p2)
     x = BatchNormalization()(x)
     x = PReLU()(x)
+    x = Dropout(0.1)(x)
     x = Conv2D(64, (5, 5), activation=None, padding='same', name='block3_conv2', kernel_regularizer=regularizers.l2(0.0001)) (x)
     x = BatchNormalization()(x)
     x = PReLU()(x)
+    x = Dropout(0.1)(x)
     x = Conv2D(64, (5, 5), activation=None, padding='same', name='block3_conv3', kernel_regularizer=regularizers.l2(0.0001)) (x)
     x = BatchNormalization()(x)
     x = PReLU()(x)
@@ -73,9 +78,11 @@ def create_model(im_height, im_width, im_chan):
     x = Conv2D(128, (5, 5), activation=None, padding='same',  name='block4_conv1', kernel_regularizer=regularizers.l2(0.0001)) (p3)
     x = BatchNormalization() (x)
     x = PReLU()(x)
+    x = Dropout(0.1)(x)
     x = Conv2D(128, (5, 5), activation=None, padding='same',  name='block4_conv2', kernel_regularizer=regularizers.l2(0.0001)) (x)
     x = BatchNormalization() (x)
     x = PReLU()(x)
+    x = Dropout(0.1)(x)
     x = Conv2D(128, (5, 5), activation=None, padding='same',  name='block4_conv3', kernel_regularizer=regularizers.l2(0.0001)) (x)
     x = BatchNormalization() (x)
     x = PReLU()(x)
@@ -85,9 +92,11 @@ def create_model(im_height, im_width, im_chan):
     x = Conv2D(256, (5, 5), activation=None, padding='same', name='block5_conv1', kernel_regularizer=regularizers.l2(0.0001)) (p4)
     x = BatchNormalization()(x)
     x = PReLU()(x)
+    x = Dropout(0.1)(x)
     x = Conv2D(256, (5, 5), activation=None, padding='same', name='block5_conv2', kernel_regularizer=regularizers.l2(0.0001)) (x)
     x = BatchNormalization()(x)
     x = PReLU()(x)
+    x = Dropout(0.1)(x)
     x = Conv2D(256, (5, 5), activation=None, padding='same', name='block5_conv3', kernel_regularizer=regularizers.l2(0.0001)) (x)
     x = BatchNormalization()(x)
     x = PReLU()(x)
@@ -102,9 +111,11 @@ def create_model(im_height, im_width, im_chan):
     x = Conv2D(256, (3, 3), activation=None, padding='same', kernel_regularizer=regularizers.l2(0.0001)) (x)
     x = BatchNormalization() (x)
     x = PReLU()(x)
+    x = Dropout(0.1)(x)
     x = Conv2D(256, (3, 3), activation=None, padding='same', kernel_regularizer=regularizers.l2(0.0001)) (x)
     x = BatchNormalization()(x)
     x = PReLU()(x)
+    x = Dropout(0.1)(x)
     x = Conv2D(256, (3, 3), activation=None, padding='same', kernel_regularizer=regularizers.l2(0.0001)) (x)
     x = BatchNormalization() (x)
     x = PReLU()(x)
@@ -119,9 +130,11 @@ def create_model(im_height, im_width, im_chan):
     x = Conv2D(128, (5, 5), activation=None, padding='same', kernel_regularizer=regularizers.l2(0.0001)) (x)
     x = BatchNormalization() (x)
     x = PReLU()(x)
+    x = Dropout(0.1)(x)
     x = Conv2D(128, (5, 5), activation=None, padding='same', kernel_regularizer=regularizers.l2(0.0001)) (x)
     x = BatchNormalization() (x)
     x = PReLU()(x)
+    x = Dropout(0.1)(x)
     x = Conv2D(128, (5, 5), activation=None, padding='same', kernel_regularizer=regularizers.l2(0.0001)) (x)
     x = BatchNormalization()(x)
     x = PReLU()(x)
@@ -136,6 +149,7 @@ def create_model(im_height, im_width, im_chan):
     x = Conv2D(64, (5, 5), activation=None, padding='same', kernel_regularizer=regularizers.l2(0.0001)) (x)
     x = BatchNormalization() (x)
     x = PReLU()(x)
+    x = Dropout(0.1)(x)
     x = Conv2D(64, (5, 5), activation=None, padding='same', kernel_regularizer=regularizers.l2(0.0001)) (x)
     x = BatchNormalization()(x)
     x = PReLU()(x)
@@ -151,6 +165,7 @@ def create_model(im_height, im_width, im_chan):
     x = Conv2D(32, (5, 5), activation=None, padding='same', kernel_regularizer=regularizers.l2(0.0001)) (x)
     x = BatchNormalization() (x)
     x = PReLU()(x)
+    x = Dropout(0.1)(x)
     x = Conv2D(32, (5, 5), activation=None, padding='same', kernel_regularizer=regularizers.l2(0.0001)) (x)
     x = BatchNormalization()(x)
     x = PReLU()(x)
@@ -164,16 +179,17 @@ def create_model(im_height, im_width, im_chan):
     outputs = Dropout(0.1)(outputs)
 
     model = Model(inputs=[inputs], outputs=[outputs])
-    model.compile(optimizer='adam', loss=mixed_dice_bce_loss, metrics=[mean_iou])
+    optimizer = Adam(lr=0.0001, amsgrad=True)
+    model.compile(optimizer=optimizer, loss=mixed_dice_bce_loss, metrics=[mean_iou])
     return model
 
 
 def fit(model, X_train, Y_train, x_valid, y_valid, output_name):
-    checkpointer = ModelCheckpoint(output_name, monitor='val_mean_iou', mode='max', verbose=0, save_best_only=True)
-    reduce_lr = ReduceLROnPlateau(factor=0.1, patience=5, min_lr=0.00001, verbose=0)
+    checkpointer = ModelCheckpoint(output_name, monitor='val_mean_iou', mode='max', save_best_only=True, period=4, verbose=1)
+    reduce_lr = ReduceLROnPlateau(factor=0.1, patience=3, min_lr=0.00001, verbose=1)
     csvlog = CSVLogger('{}_log.csv'.format(output_name.split('.')[0]))
 
-    results = model.fit(X_train, Y_train, validation_data=[x_valid, y_valid], batch_size=32, epochs=20,
+    results = model.fit(X_train, Y_train, validation_data=[x_valid, y_valid], batch_size=32, epochs=100,
                         callbacks=[checkpointer, reduce_lr, csvlog], verbose=1)
     return results
 

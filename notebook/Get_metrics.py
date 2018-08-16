@@ -15,7 +15,6 @@ time_delta = datetime.datetime.now() - start_time
 print('Loading time', time_delta)
 
 amodel = create_model(datamanager.im_height, datamanager.im_width, datamanager.im_chan)
-amodel.load_weights('model.h5')
 
 history = fit(amodel, x_train, y_train, x_valid, y_valid, 'model.h5')
 

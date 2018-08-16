@@ -66,7 +66,7 @@ crop_pad_seq = iaa.Sequential([
 
 def augment_images(x_train, y_train):
 
-    AUG_NR = 6
+    AUG_NR = 4
 
     all_x = []
     all_y = []
