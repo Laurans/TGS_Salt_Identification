@@ -186,7 +186,7 @@ def create_model(im_height, im_width, im_chan):
 
 def fit(model, X_train, Y_train, x_valid, y_valid, output_name):
     checkpointer = ModelCheckpoint(output_name, monitor='val_mean_iou', mode='max', save_best_only=True, period=4, verbose=1)
-    reduce_lr = ReduceLROnPlateau(factor=0.1, patience=3, min_lr=0.00001, verbose=1)
+    reduce_lr = ReduceLROnPlateau(factor=0.1, patience=10, min_lr=0.000001, verbose=1)
     csvlog = CSVLogger('{}_log.csv'.format(output_name.split('.')[0]))
 
     results = model.fit(X_train, Y_train, validation_data=[x_valid, y_valid], batch_size=32, epochs=100,

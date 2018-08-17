@@ -19,10 +19,11 @@ import sys
 
 affine_seq = iaa.Sequential([
     # General
-    iaa.SomeOf((1, 2),
+    iaa.SomeOf((1, 3),
                [iaa.Fliplr(0.5),
                 iaa.Affine(rotate=(-10, 10),
                            translate_percent={"x": (-0.25, 0.25)}, mode='symmetric'),
+                iaa.Flipud(0.2),
                 ]),
     # Deformations
     iaa.Sometimes(0.3, iaa.PiecewiseAffine(scale=(0.04, 0.08))),
@@ -52,10 +53,10 @@ intensity_seq = iaa.Sequential([
 
 crop_pad_seq = iaa.Sequential([
     affine_seq,
-    iaa.Sometimes(0.5, iaa.CropAndPad(
-            percent=(-0.05, 0.1),
-            pad_cval=0
-        )),
+    iaa.OneOf([
+        iaa.CropAndPad(percent=(-0.05, 0.1),pad_cval=0),
+        iaa.Crop(percent=0.05)
+        ]),
     iaa.Sometimes(0.3, iaa.Affine(
             scale={"x": (0.8, 1.2), "y": (0.8, 1.2)}, # scale images to 80-120% of their size, individually per axis
             translate_percent={"x": (-0.2, 0.2), "y": (-0.2, 0.2)}, # translate by -20 to +20 percent (per axis)
@@ -66,7 +67,7 @@ crop_pad_seq = iaa.Sequential([
 
 def augment_images(x_train, y_train):
 
-    AUG_NR = 4
+    AUG_NR = 6
 
     all_x = []
     all_y = []
