@@ -10,7 +10,7 @@ model = load_model('model_big.h5', custom_objects={'mean_iou': mean_iou, 'mixed_
 X_test = datamanager.load_test()
 
 print(X_test.shape)
-thres =  0.244
+thres =  0.5
 preds_test = (model.predict(X_test, verbose=1) > thres).astype(np.uint8)
 
 pred_downsampled = datamanager.downsample(preds_test)
