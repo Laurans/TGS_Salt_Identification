@@ -17,120 +17,18 @@ import numpy as np
 from tqdm import tqdm, trange
 import sys
 
-affine_seq = iaa.Sequential([
-    # General
-    iaa.SomeOf((1, 3),
-               [iaa.Fliplr(0.5),
-                iaa.Affine(rotate=(-10, 10),
-                           translate_percent={"x": (-0.25, 0.25)}, mode='symmetric'),
-                iaa.Flipud(0.2),
-                ]),
-    # Deformations
-    iaa.Sometimes(0.3, iaa.PiecewiseAffine(scale=(0.04, 0.08))),
-    iaa.Sometimes(0.3, iaa.PerspectiveTransform(scale=(0.05, 0.1))),
-], random_order=True)
-
-intensity_seq = iaa.Sequential([
-    iaa.Invert(0.3),
-    iaa.Sometimes(0.3, iaa.ContrastNormalization((0.5, 1.5))),
-    iaa.OneOf([
-        iaa.Noop(),
-        iaa.Sequential([
-            iaa.OneOf([
-                iaa.Add((-10, 10)),
-                iaa.AddElementwise((-10, 10)),
-                iaa.Multiply((0.95, 1.05)),
-                iaa.MultiplyElementwise((0.95, 1.05)),
-            ]),
-        ]),
-        iaa.OneOf([
-            iaa.GaussianBlur(sigma=(0.0, 1.0)),
-            iaa.AverageBlur(k=(2, 5)),
-            iaa.MedianBlur(k=(3, 5))
-        ])
-    ])
-], random_order=False)
-
-crop_pad_seq = iaa.Sequential([
-    affine_seq,
-    iaa.OneOf([
-        iaa.CropAndPad(percent=(-0.05, 0.1),pad_cval=0),
-        iaa.Crop(percent=0.05)
-        ]),
-    iaa.Sometimes(0.3, iaa.Affine(
-            scale={"x": (0.8, 1.2), "y": (0.8, 1.2)}, # scale images to 80-120% of their size, individually per axis
-            translate_percent={"x": (-0.2, 0.2), "y": (-0.2, 0.2)}, # translate by -20 to +20 percent (per axis)
-            rotate=(-16, 16), # rotate by -16 to +16 degrees
-            cval=0, # if mode is constant, use a cval between 0 and 255
-        ))
-])
+double_flip = iaa.Sequential([iaa.Fliplr(1.0), iaa.Flipud(1.0)])
 
 def augment_images(x_train, y_train):
-
-    AUG_NR = 6
-
-    all_x = []
-    all_y = []
+    all_x = [x_train]
+    all_y = [y_train]
 
     sys.stdout.flush()
-    for _ in trange(AUG_NR, desc='AUG NR'):
+    for augmentor in tqdm([iaa.Fliplr(1), iaa.Flipud(1), double_flip]):
         aug_imgs = []
         labels_imgs = []
-        for i in trange(x_train.shape[0], desc='affine_seq'):
-            augmentor = affine_seq.to_deterministic()
+        for i in trange(x_train.shape[0]):
             aug_img = augmentor.augment_image(x_train[i])
-            label_img = augmentor.augment_image(y_train[i])
-            aug_imgs.append(aug_img)
-            labels_imgs.append(label_img)
-
-        all_x.append(np.array(aug_imgs))
-        all_y.append(np.array(labels_imgs))
-
-    for _ in trange(AUG_NR, desc='AUG NR'):
-        aug_imgs = []
-        labels_imgs = []
-        for i in trange(x_train.shape[0], desc='intensity_seq'):
-            augmentor = intensity_seq
-            aug_img = augmentor.augment_image(x_train[i])
-            label_img = y_train[i]
-            aug_imgs.append(aug_img)
-            labels_imgs.append(label_img)
-
-        all_x.append(np.array(aug_imgs))
-        all_y.append(np.array(labels_imgs))
-
-    for _ in trange(AUG_NR, desc='AUG NR'):
-        aug_imgs = []
-        labels_imgs = []
-        for i in trange(x_train.shape[0], desc='affine_seq + intensity_seq'):
-            augmentor = affine_seq.to_deterministic()
-            aug_img = intensity_seq.augment_image(augmentor.augment_image(x_train[i]))
-            label_img = augmentor.augment_image(y_train[i])
-            aug_imgs.append(aug_img)
-            labels_imgs.append(label_img)
-
-        all_x.append(np.array(aug_imgs))
-        all_y.append(np.array(labels_imgs))
-
-    for _ in trange(AUG_NR, desc='AUG NR'):
-        aug_imgs = []
-        labels_imgs = []
-        for i in trange(x_train.shape[0], desc='crop_pad_seq'):
-            augmentor = crop_pad_seq.to_deterministic()
-            aug_img = augmentor.augment_image(x_train[i])
-            label_img = augmentor.augment_image(y_train[i])
-            aug_imgs.append(aug_img)
-            labels_imgs.append(label_img)
-
-        all_x.append(np.array(aug_imgs))
-        all_y.append(np.array(labels_imgs))
-
-    for _ in trange(AUG_NR, desc='AUG NR'):
-        aug_imgs = []
-        labels_imgs = []
-        for i in trange(x_train.shape[0], desc='crop_pad_seq + intensity_seq'):
-            augmentor = crop_pad_seq.to_deterministic()
-            aug_img = intensity_seq.augment_image(augmentor.augment_image(x_train[i]))
             label_img = augmentor.augment_image(y_train[i])
             aug_imgs.append(aug_img)
             labels_imgs.append(label_img)

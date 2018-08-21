@@ -18,7 +18,7 @@ class DataManager:
         # Set some parameters
         self.im_width = 128
         self.im_height = 128
-        self.im_chan = 3
+        self.im_chan = 1
         self.img_size_ori = 101
 
         self.path_train = '../data/train/'
@@ -38,7 +38,7 @@ class DataManager:
             img = load_img(self.path_train + '/images/' + id_, color_mode = "grayscale")
             x = img_to_array(img)
             x = resize(x, (128, 128, 1), mode='constant', preserve_range=True)
-            X_train[n] = np.dstack((x, x, x))
+            X_train[n] = x
 
             mask = img_to_array(load_img(self.path_train + '/masks/' + id_, color_mode = "grayscale"))
             Y_train[n] = resize(mask, (128, 128, 1), mode='constant', preserve_range=True)
@@ -61,7 +61,7 @@ class DataManager:
             x = img_to_array(img)[:,:,1]
             sizes_test.append([x.shape[0], x.shape[1]])
             x = resize(x, (128, 128, 1), mode='constant', preserve_range=True)
-            X_test[n] = np.dstack((x, x, x))
+            X_test[n] = x
 
         print('Done!')
         return X_test
@@ -116,5 +116,61 @@ def RLenc(img, order='F', format=True):
     else:
         return runs
 
+def rle_decode(rle_mask):
+    '''
+    rle_mask: run-length as string formated (start length)
+    shape: (height,width) of array to return
+    Returns numpy array, 1 - mask, 0 - background
+
+    '''
+    s = rle_mask.split()
+    starts, lengths = [np.asarray(x, dtype=int) for x in (s[0:][::2], s[1:][::2])]
+    starts -= 1
+    ends = starts + lengths
+    img = np.zeros(101*101, dtype=np.uint8)
+    for lo, hi in zip(starts, ends):
+        img[lo:hi] = 1
+    return img.reshape(101,101)
+
 def get_predict_dict(preds_test_upsampled):
     return {fn[:-4]:RLenc(np.round(preds_test_upsampled[i])) for i,fn in enumerate(tqdm(test_ids))}
+
+import pydensecrf.densecrf as dcrf
+from pydensecrf.utils import unary_from_labels, create_pairwise_bilateral
+from skimage.color import gray2rgb
+from skimage.color import rgb2gray
+
+#Original_image = Image which has to labelled
+#Mask image = Which has been labelled by some technique..
+def crf(original_image, mask_img):
+
+    # Converting annotated image to RGB if it is Gray scale
+    #if(len(mask_img.shape)<3):
+    mask_img = gray2rgb(np.squeeze(mask_img))
+
+#     #Converting the annotations RGB color to single 32 bit integer
+    annotated_label = mask_img[:,:,0] + (mask_img[:,:,1]<<8) + (mask_img[:,:,2]<<16)
+
+#     # Convert the 32bit integer color to 0,1, 2, ... labels.
+    colors, labels = np.unique(annotated_label, return_inverse=True)
+
+    n_labels = 2
+
+    #Setting up the CRF model
+    d = dcrf.DenseCRF2D(original_image.shape[1], original_image.shape[0], n_labels)
+
+    # get unary potentials (neg log probability)
+    U = unary_from_labels(labels, n_labels, gt_prob=0.7, zero_unsure=False)
+    d.setUnaryEnergy(U)
+
+    # This adds the color-independent term, features are the locations only.
+    d.addPairwiseGaussian(sxy=(3, 3), compat=3, kernel=dcrf.DIAG_KERNEL,
+                      normalization=dcrf.NORMALIZE_SYMMETRIC)
+
+    #Run Inference for 10 steps
+    Q = d.inference(10)
+
+    # Find out the most probable class for each pixel.
+    MAP = np.argmax(Q, axis=0)
+
+    return MAP.reshape((original_image.shape[0],original_image.shape[1]))

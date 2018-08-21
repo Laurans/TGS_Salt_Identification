@@ -15,11 +15,9 @@ time_delta = datetime.datetime.now() - start_time
 print('Loading time', time_delta)
 
 amodel = create_model(datamanager.im_height, datamanager.im_width, datamanager.im_chan)
-amodel.load_weights('model.h5')
+history = fit(amodel, x_train, y_train, x_valid, y_valid, 'model.h5')
 
-history = fit(amodel, x_train, y_train, x_valid, y_valid, 'model_big.h5')
-
-model = load_model('model_big.h5', custom_objects={'mean_iou': mean_iou, 'mixed_dice_bce_loss': mixed_dice_bce_loss, 'multiclass_dice_loss': multiclass_dice_loss})
+model = load_model('model.h5', custom_objects={'mixed_dice_bce_loss': mixed_dice_bce_loss, 'multiclass_dice_loss': multiclass_dice_loss})
 preds_valid = model.predict(x_valid, verbose=1)
 
 thresholds = np.linspace(0, 1, 50)
