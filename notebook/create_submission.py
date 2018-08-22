@@ -20,17 +20,22 @@ class TTA_ModelWrapper():
         Args:
             X (numpy array of dim 4): The data to get predictions for.
         """
-        X = np.expand_dims(X, 0)
-        p0 = self.model.predict(X)
-        p1 = self.model.predict(np.fliplr(X))
-        p2 = self.model.predict(np.flipud(X))
-        p3 = self.model.predict(np.fliplr(np.flipud(X)))
-        p = (p0 +
-             np.fliplr(p1) +
-             np.flipud(p2) +
-            np.fliplr(np.flipud(p3))
-             ) / 4
-        return p[0]
+        p0 = self.model.predict(X, verbose=1)
+
+        x1 = np.array([np.fliplr(i) for i in X])
+        p1 = self.model.predict(x1, verbose=1)
+        p1 = np.array([np.fliplr(i) for i in p1])
+
+        x2 = np.array([np.flipud(i) for i in X])
+        p2 = self.model.predict(x2, verbose=1)
+        p2 = np.array([np.flipud(i) for i in p2])
+
+        x3 = np.array([np.fliplr(i) for i in x2])
+        p3 = self.model.predict(x3, verbose=1)
+        p3 = np.array([np.fliplr(np.flipud(i)) for i in p3])
+
+        p = (p0 + p1 + p2 + p3 ) / 4
+        return p
 
     def _expand(self, x):
         return np.expand_dims(np.expand_dims(x, axis=0), axis=3)
@@ -38,12 +43,14 @@ class TTA_ModelWrapper():
 
 datamanager = DataManager()
 
-model = load_model('model.h5', custom_objects={'mixed_dice_bce_loss': mixed_dice_bce_loss, 'dice_loss': dice_loss})
+model = load_model('model_6.h5', custom_objects={'mixed_dice_bce_loss': mixed_dice_bce_loss, 'dice_loss': dice_loss})
 tta_model = TTA_ModelWrapper(model)
 
 X_test = datamanager.load_test()
-
+pred = tta_model.predict(X_test)
 thres =  0.5
+preds_test = (pred > thres).astype(np.uint8)
+"""
 l = []
 for image in tqdm(X_test):
     mask = (tta_model.predict(image) > thres).astype(np.uint8)
@@ -51,6 +58,7 @@ for image in tqdm(X_test):
     l.append(mask)
 
 preds_test = np.array(l)
+"""
 print('pred_test shape', preds_test.shape)
 
 pred_downsampled = datamanager.downsample(preds_test)

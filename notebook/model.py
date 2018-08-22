@@ -36,7 +36,7 @@ def dice_loss(y_true, y_pred):
     return 1. - score
 
 def mixed_dice_bce_loss(y_true, y_pred):
-    return binary_crossentropy(y_true, y_pred) + dice_loss(y_true, y_pred)
+    return binary_crossentropy(y_true, y_pred) + 5*dice_loss(y_true, y_pred)
 
 def conv_block(m, dim, acti, bn, res, do=0):
 	n = Conv2D(dim, 3, activation=acti, padding='same')(m)
@@ -70,8 +70,8 @@ def UNet(img_shape, out_ch=1, start_ch=64, depth=4, inc_rate=2., activation='rel
 	return Model(inputs=i, outputs=o)
 
 
-def create_model(im_height, im_width, im_chan):
-    model = UNet((im_height, im_width, im_chan), start_ch=16, depth=5, batchnorm=True)
+def create_model(im_height, im_width, im_chan, start=16, depth=5, residual=False):
+    model = UNet((im_height, im_width, im_chan), start_ch=start, depth=depth, batchnorm=True, residual=residual)
     model.compile(optimizer='adam', loss=mixed_dice_bce_loss)
     return model
 
