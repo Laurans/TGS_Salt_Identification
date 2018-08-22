@@ -1,7 +1,7 @@
 from data_io import *
 from model import *
 import pandas as pd
-
+from tqdm import tqdm
 import numpy as np
 
 class TTA_ModelWrapper():
@@ -43,11 +43,23 @@ class TTA_ModelWrapper():
 
 datamanager = DataManager()
 
-model = load_model('model_6.h5', custom_objects={'mixed_dice_bce_loss': mixed_dice_bce_loss, 'dice_loss': dice_loss})
-tta_model = TTA_ModelWrapper(model)
-
 X_test = datamanager.load_test()
-pred = tta_model.predict(X_test)
+
+p = []
+for m in tqdm([2, 5, 6, 7, 8], desc='pred by model'):
+    model = load_model('model_{}.h5'.format(m), custom_objects={'mixed_dice_bce_loss': mixed_dice_bce_loss, 'dice_loss': dice_loss})
+    tta_model = TTA_ModelWrapper(model)
+    pred = tta_model.predict(X_test)
+    p.append(pred)
+
+print('Now mean')
+pred = np.zeros_like(pred)
+for prediction in p:
+    pred += prediction
+
+pred = pred / len(p)
+print('Now threshold')
+
 thres =  0.5
 preds_test = (pred > thres).astype(np.uint8)
 """
