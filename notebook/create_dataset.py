@@ -9,7 +9,7 @@ datamanager = DataManager()
 X_train, Y_train, coverage = datamanager.load_train()
 
 x_train, x_valid, y_train, y_valid, cov_train, cov_valid = train_test_split(
-    X_train, Y_train, coverage, test_size=0.2, stratify=coverage[:, 1], random_state=24)
+    X_train, Y_train, coverage, test_size=0.15, stratify=coverage[:, 1], random_state=24)
 
 x_train_, y_train_ = augment_images(x_train, y_train)
 

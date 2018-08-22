@@ -4,7 +4,7 @@ warnings.filterwarnings("ignore")
 
 import tensorflow as tf
 from keras.models import Model, load_model
-from keras.layers import Input, Dropout, BatchNormalization, PReLU, ReLU
+from keras.layers import Input, Dropout, BatchNormalization, PReLU, ReLU, UpSampling2D, Concatenate
 from keras.layers.core import Lambda, RepeatVector
 from keras.layers.convolutional import Conv2D, Conv2DTranspose
 from keras.layers.pooling import MaxPooling2D
@@ -27,88 +27,51 @@ class MyCallback(Callback):
         K.set_value(self.dice_weight, min(5.0, K.get_value(self.dice_weight) + 0.2))
         print('Dice weight {:0.2f}'.format(K.get_value(self.dice_weight)))
 
-def multiclass_dice_loss(output, target):
-    return 1 - (2* K.sum(output*target)) / (K.sum(output) + K.sum(target) + 1e-7)
+def dice_loss(y_true, y_pred):
+    smooth = 1.
+    y_true_f = K.flatten(y_true)
+    y_pred_f = K.flatten(y_pred)
+    intersection = y_true_f * y_pred_f
+    score = (2. * K.sum(intersection) + smooth) / (K.sum(y_true_f) + K.sum(y_pred_f) + smooth)
+    return 1. - score
 
 def mixed_dice_bce_loss(y_true, y_pred):
-    bce_loss = binary_crossentropy(y_true=y_true, y_pred=y_pred)
-    dice_loss = multiclass_dice_loss(y_pred, y_true)
-    return 5*dice_loss+ bce_loss
+    return binary_crossentropy(y_true, y_pred) + dice_loss(y_true, y_pred)
 
-def green_unit(filter):
+def conv_block(m, dim, acti, bn, res, do=0):
+	n = Conv2D(dim, 3, activation=acti, padding='same')(m)
+	n = BatchNormalization()(n) if bn else n
+	n = Dropout(do)(n) if do else n
+	n = Conv2D(dim, 3, activation=acti, padding='same')(n)
+	n = BatchNormalization()(n) if bn else n
+	return Concatenate()([m, n]) if res else n
 
-    def f(i):
-        x = Conv2D(filter, (3, 3), activation=None, padding='same',kernel_regularizer=regularizers.l2(0.0001))(i)
-        x = BatchNormalization() (x)
-        x = PReLU()(x)
-        x = Dropout(0.1)(x)
-        x = Conv2D(filter, (3, 3), activation=None, padding='same',kernel_regularizer=regularizers.l2(0.0001))(x)
-        x = BatchNormalization() (x)
-        x = PReLU()(x)
-        x = add([i,x])
-        return x
+def level_block(m, dim, depth, inc, acti, do, bn, mp, up, res):
+	if depth > 0:
+		n = conv_block(m, dim, acti, bn, res)
+		m = MaxPooling2D()(n) if mp else Conv2D(dim, 3, strides=2, padding='same')(n)
+		m = level_block(m, int(inc*dim), depth-1, inc, acti, do, bn, mp, up, res)
+		if up:
+			m = UpSampling2D()(m)
+			m = Conv2D(dim, 2, activation=acti, padding='same')(m)
+		else:
+			m = Conv2DTranspose(dim, 3, strides=2, activation=acti, padding='same')(m)
+		n = Concatenate()([n, m])
+		m = conv_block(n, dim, acti, bn, res)
+	else:
+		m = conv_block(m, dim, acti, bn, res, do)
+	return m
 
-    return f
+def UNet(img_shape, out_ch=1, start_ch=64, depth=4, inc_rate=2., activation='relu',
+		 dropout=0.5, batchnorm=False, maxpool=True, upconv=True, residual=False):
+	i = Input(shape=img_shape)
+	o = level_block(i, start_ch, depth, inc_rate, activation, dropout, batchnorm, maxpool, upconv, residual)
+	o = Conv2D(out_ch, 1, activation='sigmoid')(o)
+	return Model(inputs=i, outputs=o)
 
-def red_unit(filter):
-
-    def f(i):
-        x = Conv2D(filter, (3, 3), activation=None, padding='same', kernel_regularizer=regularizers.l2(0.0001)) (i)
-        x = BatchNormalization() (x)
-        x = PReLU()(x)
-        x = Dropout(0.1)(x)
-        x = Conv2D(filter, (3, 3), activation=None, padding='same', kernel_regularizer=regularizers.l2(0.0001)) (x)
-        x = BatchNormalization() (x)
-        x = PReLU()(x)
-        x = MaxPooling2D()(x)
-        return x
-    return f
-
-def yellow_unit(filter):
-    def f(i):
-        x = Conv2DTranspose(filter, (2, 2), strides=(2, 2), padding='same') (i)
-        x = PReLU()(x)
-        x = Conv2D(filter, (3, 3), activation=None, padding='same', kernel_regularizer=regularizers.l2(0.0001)) (x)
-        x = BatchNormalization() (x)
-        x = PReLU()(x)
-        x = Conv2D(filter, (3, 3), activation=None, padding='same', kernel_regularizer=regularizers.l2(0.0001)) (x)
-        x = BatchNormalization() (x)
-        x = PReLU()(x)
-        return x
-    return f
 
 def create_model(im_height, im_width, im_chan):
-    inputs = Input((im_height, im_width, im_chan))
-    s = Lambda(lambda x: x/255)(inputs)
-
-    # Green unit
-    x_0_0 = green_unit(8*2)(s)
-    x_1_0 = red_unit(16*2)(x_0_0)
-    x_2_0 = red_unit(32*2)(x_1_0)
-    x_3_0 = red_unit(64*2)(x_2_0)
-    x_4_0 = red_unit(128*2)(x_3_0)
-
-    print(x_0_0.shape)
-    print(x_1_0.shape)
-    print(x_2_0.shape)
-    print(x_3_0.shape)
-    print(x_4_0.shape)
-
-    # Decoder
-    x_4_1 = green_unit(128*2)(x_4_0)
-    x_3_1 = concatenate([yellow_unit(64*2)(x_4_1), green_unit(64*2)(x_3_0)])
-    x_2_1 = concatenate([yellow_unit(32*2)(x_3_1), green_unit(32*2)(x_2_0)])
-    x_1_1 = concatenate([yellow_unit(16*2)(x_2_1), green_unit(16*2)(x_1_0)])
-    x_0_1 = concatenate([yellow_unit(8*2)(x_1_1), green_unit(8*2)(x_0_0)])
-    x_0_1 = green_unit(8*2*2)(x_0_1)
-    print('decoder')
-    print(x_4_1.shape)
-    print(x_3_1.shape)
-    print(x_2_1.shape)
-    print(x_1_1.shape)
-    print(x_0_1.shape)
-    outputs = Conv2D(1, (1, 1), activation='sigmoid') (x_0_1)
-    model = Model(inputs=inputs, outputs=outputs)
+    model = UNet((im_height, im_width, im_chan), start_ch=16, depth=5, batchnorm=True)
     model.compile(optimizer='adam', loss=mixed_dice_bce_loss)
     return model
 
@@ -116,7 +79,7 @@ def create_model(im_height, im_width, im_chan):
 def fit(model, X_train, Y_train, x_valid, y_valid, output_name):
     early_stopping = EarlyStopping(patience=10, verbose=1)
     checkpointer = ModelCheckpoint(output_name, save_best_only=True, verbose=1)
-    reduce_lr = ReduceLROnPlateau(factor=0.1, patience=5, min_lr=1e-5, verbose=1)
+    reduce_lr = ReduceLROnPlateau(factor=0.1, patience=5, min_lr=1e-6, verbose=1)
     csvlog = CSVLogger('{}_log.csv'.format(output_name.split('.')[0]))
 
     results = model.fit(X_train, Y_train, validation_data=[x_valid, y_valid], batch_size=32, epochs=200,

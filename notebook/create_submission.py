@@ -38,7 +38,7 @@ class TTA_ModelWrapper():
 
 datamanager = DataManager()
 
-model = load_model('model.h5', custom_objects={'mixed_dice_bce_loss': mixed_dice_bce_loss, 'multiclass_dice_loss': multiclass_dice_loss})
+model = load_model('model.h5', custom_objects={'mixed_dice_bce_loss': mixed_dice_bce_loss, 'dice_loss': dice_loss})
 tta_model = TTA_ModelWrapper(model)
 
 X_test = datamanager.load_test()
@@ -48,7 +48,7 @@ l = []
 for image in tqdm(X_test):
     mask = (tta_model.predict(image) > thres).astype(np.uint8)
     crf_output = crf(image, mask)
-    l.append(crf_output)
+    l.append(mask)
 
 preds_test = np.array(l)
 print('pred_test shape', preds_test.shape)
