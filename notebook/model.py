@@ -1,10 +1,14 @@
-
 import warnings
 warnings.filterwarnings("ignore")
 
+import numpy as np
+np.random.seed(1)
+
 import tensorflow as tf
+tf.set_random_seed(2)
+
 from keras.models import Model, load_model
-from keras.layers import Input, Dropout, BatchNormalization, PReLU, ReLU, UpSampling2D, Concatenate
+from keras.layers import Input, Dropout, BatchNormalization, PReLU, ReLU, UpSampling2D, Concatenate, Add
 from keras.layers.core import Lambda, RepeatVector
 from keras.layers.convolutional import Conv2D, Conv2DTranspose
 from keras.layers.pooling import MaxPooling2D
@@ -15,7 +19,7 @@ from keras.applications.vgg16 import VGG16, preprocess_input
 from keras.losses import binary_crossentropy
 from keras.optimizers import Adam
 from keras import regularizers
-import numpy as np
+
 
 dice_weight = K.variable(0.0)
 

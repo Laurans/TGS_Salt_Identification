@@ -3,6 +3,7 @@ from model import *
 import pandas as pd
 from tqdm import tqdm
 import numpy as np
+import keras.backend as K
 
 class TTA_ModelWrapper():
     """A simple TTA wrapper for keras computer vision models.
@@ -20,21 +21,21 @@ class TTA_ModelWrapper():
         Args:
             X (numpy array of dim 4): The data to get predictions for.
         """
-        p0 = self.model.predict(X, verbose=1)
+        p = self.model.predict(X, verbose=1)
 
         x1 = np.array([np.fliplr(i) for i in X])
         p1 = self.model.predict(x1, verbose=1)
-        p1 = np.array([np.fliplr(i) for i in p1])
+        p += np.array([np.fliplr(i) for i in p1])
 
-        x2 = np.array([np.flipud(i) for i in X])
-        p2 = self.model.predict(x2, verbose=1)
-        p2 = np.array([np.flipud(i) for i in p2])
+        x1 = np.array([np.flipud(i) for i in X])
+        p1 = self.model.predict(x1, verbose=1)
+        p += np.array([np.flipud(i) for i in p1])
 
-        x3 = np.array([np.fliplr(i) for i in x2])
-        p3 = self.model.predict(x3, verbose=1)
-        p3 = np.array([np.fliplr(np.flipud(i)) for i in p3])
+        x1 = np.array([np.fliplr(i) for i in x1])
+        p1 = self.model.predict(x1, verbose=1)
+        p += np.array([np.fliplr(np.flipud(i)) for i in p1])
 
-        p = (p0 + p1 + p2 + p3 ) / 4
+        p /= 4
         return p
 
     def _expand(self, x):
@@ -45,27 +46,28 @@ datamanager = DataManager()
 
 X_test = datamanager.load_test()
 
-p = []
-for m in tqdm([2, 5, 6, 7, 8], desc='pred by model'):
-    model = load_model('model_{}.h5'.format(m), custom_objects={'mixed_dice_bce_loss': mixed_dice_bce_loss, 'dice_loss': dice_loss})
-    tta_model = TTA_ModelWrapper(model)
-    pred = tta_model.predict(X_test)
-    p.append(pred)
+pred = np.zeros(X_test.shape)
+n = 0
 
+bootstrap1 = [2, 5, 6, 7, 8]
+bootstrap2 = [6, 2, 0, 4, 7]
+
+for e, bootstrap in enumerate([bootstrap1, bootstrap2]):
+    for m in tqdm(bootstrap, desc='pred by model'):
+        model = load_model('model_archive/bootstrap_{}/model_{}.h5'.format(e+1, m), custom_objects={'mixed_dice_bce_loss': mixed_dice_bce_loss, 'dice_loss': dice_loss})
+        tta_model = TTA_ModelWrapper(model)
+        pred += tta_model.predict(X_test)
+        n += 1
+        K.clear_session()
 print('Now mean')
-pred = np.zeros_like(pred)
-for prediction in p:
-    pred += prediction
-
-pred = pred / len(p)
+pred /= n
 print('Now threshold')
 
 thres =  0.5
 preds_test = (pred > thres).astype(np.uint8)
 """
 l = []
-for image in tqdm(X_test):
-    mask = (tta_model.predict(image) > thres).astype(np.uint8)
+for image, mask in zip(tqdm(X_test), preds_test):
     crf_output = crf(image, mask)
     l.append(mask)
 

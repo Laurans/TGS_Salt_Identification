@@ -1,3 +1,12 @@
+import warnings
+warnings.filterwarnings("ignore")
+
+import numpy as np
+np.random.seed(1)
+
+import tensorflow as tf
+tf.set_random_seed(2)
+
 from data_io import *
 from data_augmentation import *
 from metrics import *
