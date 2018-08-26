@@ -33,9 +33,10 @@ y_valid = np.piecewise(y_valid, [y_valid > 127.5, y_valid < 127.5], [1, 0])
 time_delta = datetime.datetime.now() - start_time
 print('Loading time', time_delta)
 
-#amodel = create_model(datamanager.im_height, datamanager.im_width, datamanager.im_chan)
-#history = fit(amodel, x_train, y_train, x_valid, y_valid, 'model.h5')
-
+amodel = create_model((datamanager.im_height, datamanager.im_width, datamanager.im_chan), False, start_ch=32, depth=5, residual=False, maxpool=True, upconv=True)
+print(amodel.summary())
+history = fit(amodel, x_train_, y_train_, x_valid, y_valid, 'model.h5')
+"""
 model = load_model('model_6.h5', custom_objects={'mixed_dice_bce_loss': mixed_dice_bce_loss, 'dice_loss': dice_loss})
 preds_valid = model.predict(x_valid, verbose=1)
 
@@ -47,3 +48,4 @@ iou_best = ious[threshold_best_index]
 threshold_best = thresholds[threshold_best_index]
 
 print("Threshold ", threshold_best, 'Ious', iou_best)
+"""

@@ -4,6 +4,7 @@ import pandas as pd
 from tqdm import tqdm
 import numpy as np
 import keras.backend as K
+import joblib
 
 class TTA_ModelWrapper():
     """A simple TTA wrapper for keras computer vision models.
@@ -41,28 +42,35 @@ class TTA_ModelWrapper():
     def _expand(self, x):
         return np.expand_dims(np.expand_dims(x, axis=0), axis=3)
 
-
+return_to_checkpoint = False
 datamanager = DataManager()
+if not return_to_checkpoint:
 
-X_test = datamanager.load_test()
+    X_test = datamanager.load_test()
 
-pred = np.zeros(X_test.shape)
-n = 0
+    pred = np.zeros(X_test.shape)
+    n = 0
 
-bootstrap1 = [2, 5, 6, 7, 8]
-bootstrap2 = [6, 2, 0, 4, 7]
-
-for e, bootstrap in enumerate([bootstrap1, bootstrap2]):
+    #bootstrap1 = [2, 5, 6, 7, 8]
+    #bootstrap2 = [6, 2, 0, 4, 7]
+    bootstrap = range(18)
+    #for e, bootstrap in enumerate([bootstrap1, bootstrap2]):
+    e = 2
     for m in tqdm(bootstrap, desc='pred by model'):
-        model = load_model('model_archive/bootstrap_{}/model_{}.h5'.format(e+1, m), custom_objects={'mixed_dice_bce_loss': mixed_dice_bce_loss, 'dice_loss': dice_loss})
+        model = load_model('model_archive/bootstrap_{}/loss_model_{}.h5'.format(e+1, m), custom_objects={'mixed_dice_bce_loss': mixed_dice_bce_loss, 'dice_loss': dice_loss, 'iou_metric':iou_metric})
         tta_model = TTA_ModelWrapper(model)
         pred += tta_model.predict(X_test)
         n += 1
         K.clear_session()
-print('Now mean')
-pred /= n
-print('Now threshold')
+    print('Now mean')
+    pred /= n
+    print('Checkpoint')
+    joblib.dump(pred, 'mean_pred_bootstrap.bz2')
+else:
+    print('Return to checkpoint')
+    pred = joblib.load('mean_pred_bootstrap.bz2')
 
+print('Now threshold')
 thres =  0.5
 preds_test = (pred > thres).astype(np.uint8)
 """

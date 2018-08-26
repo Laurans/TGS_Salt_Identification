@@ -1,13 +1,13 @@
 from itertools import chain
 import numpy as np
-
+from skimage.morphology import label
 
 def iou_metric(y_true_in, y_pred_in, print_table=False):
-    labels = y_true_in
-    y_pred = y_pred_in
+    labels = label(y_true_in > 0.5)
+    y_pred = label(y_pred_in > 0.5)
 
-    true_objects = 2
-    pred_objects = 2
+    true_objects = len(np.unique(labels))
+    pred_objects = len(np.unique(y_pred))
 
     intersection = np.histogram2d(labels.flatten(), y_pred.flatten(), bins=(true_objects, pred_objects))[0]
 
@@ -61,4 +61,4 @@ def iou_metric_batch(y_true_in, y_pred_in):
     for batch in range(batch_size):
         value = iou_metric(y_true_in[batch], y_pred_in[batch])
         metric.append(value)
-    return np.mean(metric)
+    return np.array(np.mean(metric), dtype=np.float32)

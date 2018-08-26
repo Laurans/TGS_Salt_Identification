@@ -19,12 +19,18 @@ import sys
 
 double_flip = iaa.Sequential([iaa.Fliplr(1.0), iaa.Flipud(1.0)])
 
-def augment_images(x_train, y_train):
+def augment_images(x_train, y_train, with_constrast=False, with_noise=False):
     all_x = [x_train]
     all_y = [y_train]
 
-    sys.stdout.flush()
-    for augmentor in tqdm([iaa.Fliplr(1), iaa.Flipud(1), double_flip]):
+    aug_list = [iaa.Fliplr(1), iaa.Flipud(1), double_flip]
+
+    if with_constrast:
+        aug_list.append(iaa.ContrastNormalization(alpha=1.5))
+
+    if with_noise:
+        aug_list.append(iaa.AdditiveGaussianNoise(scale=0.05*255))
+    for augmentor in tqdm(aug_list):
         aug_imgs = []
         labels_imgs = []
         for i in trange(x_train.shape[0]):
