@@ -53,11 +53,11 @@ if not return_to_checkpoint:
 
     #bootstrap1 = [2, 5, 6, 7, 8]
     #bootstrap2 = [6, 2, 0, 4, 7]
-    bootstrap = range(18)
+    bootstrap = [0, 2, 3]
     #for e, bootstrap in enumerate([bootstrap1, bootstrap2]):
-    e = 2
+    e = 4
     for m in tqdm(bootstrap, desc='pred by model'):
-        model = load_model('model_archive/bootstrap_{}/loss_model_{}.h5'.format(e+1, m), custom_objects={'mixed_dice_bce_loss': mixed_dice_bce_loss, 'dice_loss': dice_loss, 'iou_metric':iou_metric})
+        model = load_model('model_archive/bootstrap_{}/model_{}.h5'.format(e, m), custom_objects={'mixed_dice_bce_loss': mixed_dice_bce_loss, 'dice_loss': dice_loss, 'iou_metric':iou_metric, 'focal_loss':focal_loss})
         tta_model = TTA_ModelWrapper(model)
         pred += tta_model.predict(X_test)
         n += 1

@@ -21,7 +21,7 @@ datamanager = DataManager()
 
 X_train, Y_train, coverage = datamanager.load_train()
 
-for i, (start, depth, residual, maxpool, upconv, aug_noise, aug_contrast, seed, vggunet) in enumerate(params):
+for i, (start, depth, residual, maxpool, upconv, aug_noise, aug_contrast, seed, vggunet, gaus_noise) in enumerate(params):
     print('-'*10)
     print('Start {}/{} model'.format(i, len(params)))
     print('-'*10)
@@ -34,7 +34,7 @@ for i, (start, depth, residual, maxpool, upconv, aug_noise, aug_contrast, seed, 
 
     y_valid = np.piecewise(y_valid, [y_valid > 127.5, y_valid < 127.5], [1, 0])
 
-    amodel = create_model((datamanager.im_height, datamanager.im_width, datamanager.im_chan), vggunet, start, depth, maxpool, upconv, residual)
+    amodel = create_model((datamanager.im_height, datamanager.im_width, datamanager.im_chan), vggunet, start, depth, maxpool, upconv, residual, gaus_noise)
     history = fit(amodel, x_train_, y_train_, x_valid, y_valid, 'model_{}.h5'.format(i))
 
     print('-'*10)
