@@ -11,31 +11,38 @@ from skimage.filters import rank
 from skimage.morphology import label
 from keras.applications.vgg16 import preprocess_input
 
+
+from skimage.feature import local_binary_pattern
+
 import cv2
 import numpy as np
 
 from tqdm import tqdm, trange
 import sys
 
-double_flip = iaa.Sequential([iaa.Fliplr(1.0), iaa.Flipud(1.0)])
+def get_local_binary_pattern_feat(image, radius, no_points):
+    lbp = local_binary_pattern(image, no_points, radius, method='uniform')
+    return lbp
 
-def augment_images(x_train, y_train, with_constrast=False, with_noise=False):
-    all_x = [x_train]
-    all_y = [y_train]
+def apply_features(image):
+    lpb_large = get_local_binary_pattern_feat(image, 8, 24)
+    return np.dstack((image, lpb_large))
 
-    aug_list = [iaa.Fliplr(1), iaa.Flipud(1), double_flip]
+def augment_images(x_train, y_train):
+    all_x = []
+    all_y = []
 
-    if with_constrast:
-        aug_list.append(iaa.ContrastNormalization(alpha=1.5))
-
-    if with_noise:
-        aug_list.append(iaa.AdditiveGaussianNoise(scale=0.05*255))
+    aug_list = [iaa.Noop(), iaa.Fliplr(1), iaa.Flipud(1)]
+    aug_list.append(iaa.Sequential([iaa.Fliplr(1.0), iaa.Flipud(1.0)]))
+    
     for augmentor in tqdm(aug_list):
         aug_imgs = []
         labels_imgs = []
         for i in trange(x_train.shape[0]):
-            aug_img = augmentor.augment_image(x_train[i])
-            label_img = augmentor.augment_image(y_train[i])
+            deterministic = augmentor.to_deterministic()
+            aug_img = deterministic.augment_image(x_train[i])
+            label_img = deterministic.augment_image(y_train[i])
+
             aug_imgs.append(aug_img)
             labels_imgs.append(label_img)
 

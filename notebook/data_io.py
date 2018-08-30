@@ -1,4 +1,5 @@
 from skimage.io import imread, imshow, concatenate_images
+from skimage.util import pad, crop
 from skimage.transform import resize
 import cv2
 from tqdm import tqdm
@@ -16,10 +17,11 @@ class DataManager:
 
     def __init__(self):
         # Set some parameters
-        self.im_width = 128
-        self.im_height = 128
+        self.im_width = 124
+        self.im_height = 124
         self.im_chan = 1
         self.img_size_ori = 101
+        self.margin = [[11, 12], [11, 12]]
 
         self.path_train = '../data/train/'
         self.path_test = '../data/test/'
@@ -30,20 +32,22 @@ class DataManager:
     def load_train(self):
         X_train = np.zeros((len(self.train_ids), self.im_height, self.im_width, self.im_chan), dtype=np.uint8)
         coverage = np.zeros((len(self.train_ids), 2), dtype=np.float32)
-        Y_train = np.zeros((len(self.train_ids), self.im_height, self.im_width, 1), dtype=np.uint8)
+        Y_train = np.zeros((len(self.train_ids), self.im_height, self.im_width, self.im_chan ), dtype=np.uint8)
 
         print('Getting and resizing train images and mask ...')
 
         for n, id_ in enumerate(tqdm(self.train_ids)):
             img = load_img(self.path_train + '/images/' + id_, color_mode = "grayscale")
-            x = img_to_array(img)
-            x = resize(x, (128, 128, 1), mode='constant', preserve_range=True)
+            x = np.squeeze(img_to_array(img))
+            x = np.expand_dims(pad(x, pad_width=self.margin, mode='symmetric'), -1) #resize(x, (self.im_height, self.im_width), mode='constant', preserve_range=True)
             X_train[n] = x
 
-            mask = img_to_array(load_img(self.path_train + '/masks/' + id_, color_mode = "grayscale"))
-            Y_train[n] = resize(mask, (128, 128, 1), mode='constant', preserve_range=True)
+            mask_ori = img_to_array(load_img(self.path_train + '/masks/' + id_, color_mode = "grayscale"))
+            mask = np.squeeze(mask_ori)
+            mask = np.expand_dims(pad(mask, pad_width=self.margin, mode='symmetric'), -1) #resize(mask, (self.im_height, self.im_width), mode='constant', preserve_range=True)
+            Y_train[n] = mask
 
-            coverage[n, 0] = (mask / 255).sum() / self.img_size_ori**2
+            coverage[n, 0] = (mask_ori / 255).sum() / self.img_size_ori**2
             coverage[n, 1] = cov_to_class(coverage[n, 0])
 
         print('Done!')
@@ -52,31 +56,28 @@ class DataManager:
 
     def load_test(self):
         X_test = np.zeros((len(self.test_ids), self.im_height, self.im_width, self.im_chan), dtype=np.uint8)
-
-        sizes_test = []
         print('Getting and resizing test images ... ')
 
         for n, id_ in enumerate(tqdm(self.test_ids)):
-            img = load_img(self.path_test + '/images/' + id_)
-            x = img_to_array(img)[:,:,1]
-            sizes_test.append([x.shape[0], x.shape[1]])
-            x = resize(x, (128, 128, 1), mode='constant', preserve_range=True)
-            X_test[n] = x
+            img = load_img(self.path_test + '/images/' + id_, color_mode = "grayscale")
+            x = np.squeeze(img_to_array(img))
+            x = pad(x, pad_width=self.margin, mode='symmetric') #resize(x, (self.im_height, self.im_width), mode='constant', preserve_range=True)
+            X_test[n] = np.expand_dims(x, -1)
 
         print('Done!')
         return X_test
 
     def downsample(self, list_img):
         def process_img(img):
-            return resize(img, (self.img_size_ori, self.img_size_ori), mode='constant', preserve_range=True)
+            return np.expand_dims(crop(np.squeeze(img), crop_width=self.margin), -1) #resize(img, (self.img_size_ori, self.img_size_ori), mode='constant', preserve_range=True)
 
-        return [np.squeeze(process_img(x)) for x in list_img]
+        return np.array([np.squeeze(process_img(x)) for x in list_img])
 
-    def save_dataset(self, obj):
-        joblib.dump(obj, "../data/generated/dataset.bz2")
+    def save_dataset(self, obj, name='dataset'):
+        joblib.dump(obj, "../data/generated/{}.bz2".format(name))
 
-    def load_dataset(self):
-        return joblib.load('../data/generated/dataset.bz2')
+    def load_dataset(self, name='dataset'):
+        return joblib.load('../data/generated/{}.bz2'.format(name))
 
 
 def RLenc(img, order='F', format=True):
