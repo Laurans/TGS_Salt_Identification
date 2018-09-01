@@ -12,13 +12,18 @@ import joblib
 
 datamanager = DataManager()
 
-X_test = datamanager.load_test()
+X_test, _ = datamanager.load_test()
 
-model = load_model('model.h5', custom_objects={'mixed_dice_bce_loss': mixed_dice_bce_loss, 'dice_loss': dice_loss, 'iou_metric':iou_metric, 'focal_loss':focal_loss})
+model = load_model('model.h5', custom_objects={
+    'mixed_dice_bce_loss': mixed_dice_bce_loss, 
+    'dice_loss': dice_loss, 
+    'iou_metric':iou_metric, 
+    'focal_loss':focal_loss,
+     'focal_loss':focal_loss, 'Scale': Scale})
 tta_model = TTA_ModelWrapper(model)
 pred = tta_model.predict(X_test)
 
-thres =  0.59
+thres =  0.57
 preds_test = (pred > thres).astype(np.uint8)
 print('pred_test shape', preds_test.shape)
 

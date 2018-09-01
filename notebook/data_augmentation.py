@@ -25,7 +25,7 @@ def get_local_binary_pattern_feat(image, radius, no_points):
     return lbp
 
 def apply_features(image):
-    lpb_large = get_local_binary_pattern_feat(image, 8, 24)
+    lpb_large = get_local_binary_pattern_feat(image, 2, 16)
     return np.dstack((image, lpb_large))
 
 def augment_images(x_train, y_train):
@@ -55,7 +55,6 @@ def augment_images(x_train, y_train):
     print()
     print('Augment images done')
     return x_train_, y_train_
-
 
 def plot_list(images=[], labels=[]):
     n_img = len(images)

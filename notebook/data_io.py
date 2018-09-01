@@ -7,6 +7,7 @@ import numpy as np
 import os
 from keras.preprocessing.image import ImageDataGenerator, array_to_img, img_to_array, load_img
 import joblib
+import pandas as pd
 
 def cov_to_class(val):
     for i in range(0, 11):
@@ -21,18 +22,20 @@ class DataManager:
         self.im_height = 124
         self.im_chan = 1
         self.img_size_ori = 101
-        self.margin = [[11, 12], [11, 12]]
+        self.margin = [[11, 11+1], [11, 11+1]]
 
         self.path_train = '../data/train/'
         self.path_test = '../data/test/'
+        self.depths = pd.read_csv('../data/depths.csv')
 
         self.train_ids = next(os.walk(self.path_train+"images"))[2]
         self.test_ids = next(os.walk(self.path_test+'images'))[2]
-
+        
     def load_train(self):
         X_train = np.zeros((len(self.train_ids), self.im_height, self.im_width, self.im_chan), dtype=np.uint8)
         coverage = np.zeros((len(self.train_ids), 2), dtype=np.float32)
         Y_train = np.zeros((len(self.train_ids), self.im_height, self.im_width, self.im_chan ), dtype=np.uint8)
+        train_depth = np.zeros((len(self.train_ids),))
 
         print('Getting and resizing train images and mask ...')
 
@@ -50,12 +53,15 @@ class DataManager:
             coverage[n, 0] = (mask_ori / 255).sum() / self.img_size_ori**2
             coverage[n, 1] = cov_to_class(coverage[n, 0])
 
+            train_depth[n] = self.depths[self.depths.id == id_.split('.')[0]]['z'].values[0]
+
         print('Done!')
 
-        return X_train, Y_train, coverage
+        return X_train, Y_train, coverage, train_depth
 
     def load_test(self):
         X_test = np.zeros((len(self.test_ids), self.im_height, self.im_width, self.im_chan), dtype=np.uint8)
+        test_depth = np.zeros((len(self.test_ids,)))
         print('Getting and resizing test images ... ')
 
         for n, id_ in enumerate(tqdm(self.test_ids)):
@@ -64,8 +70,10 @@ class DataManager:
             x = pad(x, pad_width=self.margin, mode='symmetric') #resize(x, (self.im_height, self.im_width), mode='constant', preserve_range=True)
             X_test[n] = np.expand_dims(x, -1)
 
+            test_depth[n] = self.depths[self.depths.id == id_.split('.')[0]]['z'].values[0]
+
         print('Done!')
-        return X_test
+        return X_test, test_depth
 
     def downsample(self, list_img):
         def process_img(img):

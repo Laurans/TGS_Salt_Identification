@@ -95,7 +95,7 @@ def best_iou_and_threshold(y_true, y_pred, plot=False, shortcut=False):
 
     return iou_best, threshold_best
 
-def plot_prediction(imgs, masks, preds, fname='sanity_check_prediction.png'):
+def plot_prediction(imgs, masks, preds, fname='sanity_check_prediction.png', image_id=[]):
     max_images = 48
     grid_width = 12
     grid_height = int(max_images / grid_width)*3
@@ -107,7 +107,10 @@ def plot_prediction(imgs, masks, preds, fname='sanity_check_prediction.png'):
     for i, (img, mask, pred) in enumerate(zip(imgs, masks, preds)):
         ax_image = axs[int(i / grid_width)*3, i % grid_width]
         ax_image.imshow(img, cmap="Greys")
-        ax_image.set_title("Image")
+        if image_id != []:
+            ax_image.set_title('{}'.format(image_id[i]))
+        else:
+            ax_image.set_title("Image")
         ax_image.set_yticklabels([])
         ax_image.set_xticklabels([])
         ax_mask = axs[int(i / grid_width)*3+1, i % grid_width]
@@ -126,3 +129,12 @@ def plot_prediction(imgs, masks, preds, fname='sanity_check_prediction.png'):
 
     plt.savefig(fname=fname)
     plt.close(fig)
+
+def plot_hist(y_true, y_pred):
+    values = [iou_metric(y_, y_hat) for y_, y_hat in zip(tqdm(y_true, desc='iou for hist'), y_pred)]
+    plt.hist(values)
+    plt.ylabel('Count images')
+    plt.xlabel('IOU')
+    plt.savefig(fname='hist_iou_value.png')
+    plt.close()
+    return values
