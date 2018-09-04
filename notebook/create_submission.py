@@ -19,11 +19,11 @@ model = load_model('model.h5', custom_objects={
     'dice_loss': dice_loss, 
     'iou_metric':iou_metric, 
     'focal_loss':focal_loss,
-     'focal_loss':focal_loss, 'Scale': Scale})
+    'Scale': Scale})
 tta_model = TTA_ModelWrapper(model)
 pred = tta_model.predict(X_test)
 
-thres =  0.489
+thres =  0.5
 preds_test = (pred > thres).astype(np.uint8)
 print('pred_test shape', preds_test.shape)
 
