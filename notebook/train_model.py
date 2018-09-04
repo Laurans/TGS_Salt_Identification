@@ -18,10 +18,10 @@ import datetime
 
 DATA = True
 MODEL = False
-TRAIN = False
+TRAIN = True
 PRED = True
 SANITY_CHECK_IOU = False
-CRF = False
+CRF = True
 HIST = True
 
 
@@ -72,20 +72,20 @@ if PRED:
         y_pred_down = datamanager.downsample(y_pred)
         plot_prediction(x_valid_down, y_valid_down, y_pred_down)
 
-    if CRF:
-        l=[]
-        for image, mask in zip(tqdm(x_valid, desc='CRF'), y_pred_down):
-            crf_output = crf(image, mask)
-            l.append(crf_output)
+        if CRF:
+            l=[]
+            for image, mask in zip(tqdm(x_valid_down, desc='CRF'), y_pred_down):
+                crf_output = crf(image, mask)
+                l.append(crf_output)
 
-        y_pred_down = np.array(l)
-        print('After CRF, iou:', iou_metric_batch(y_valid_down, y_pred_down))
+            y_pred_down = np.array(l)
+            print('After CRF, iou:', iou_metric_batch(y_valid_down, y_pred_down))
 
-        print('plot prediction')
-        plot_prediction(x_valid_down, y_valid_down, y_pred_down, fname='sanity_check_prediction_CRF.png')
+            print('plot prediction')
+            plot_prediction(x_valid_down, y_valid_down, y_pred_down, fname='sanity_check_prediction_CRF.png')
 
-    if HIST:
-        iou_scores = plot_hist(y_valid_down, y_pred_down)
-        indexes = np.array(iou_scores) < 0.4
-        plot_prediction(x_valid_down[indexes], y_valid_down[indexes], y_pred_down[indexes], fname='hard_images.png', image_id=ids_valid[indexes])  
+        if HIST:
+            iou_scores = plot_hist(y_valid_down, y_pred_down)
+            indexes = np.array(iou_scores) < 0.4
+            plot_prediction(x_valid_down[indexes], y_valid_down[indexes], y_pred_down[indexes], fname='hard_images.png', image_id=ids_valid[indexes])  
 

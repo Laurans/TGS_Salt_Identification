@@ -120,6 +120,10 @@ def UNet(img_shape, start_ch=64, depth=4, inc_rate=2):
         n = BatchNormalization(epsilon=eps, axis=bn_axis)(n)
         n = Scale(axis=bn_axis)(n)
         n = acti_layer(n, 'relu')
+        se = GlobalMaxPooling2D()(n)
+        se = Dense(dim//2, activation='relu')(se)
+        se = Dense(dim, activation='sigmoid')(se)
+        n = Multiply()([n, se])
 
         shortcut = Conv2D(dim, 1, activation=None, padding='same', kernel_initializer='he_normal', kernel_regularizer=l2(1e-4))(m)
         shortcut = BatchNormalization(epsilon=eps, axis=bn_axis)(shortcut)

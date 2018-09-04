@@ -23,7 +23,7 @@ model = load_model('model.h5', custom_objects={
 tta_model = TTA_ModelWrapper(model)
 pred = tta_model.predict(X_test)
 
-thres =  0.71
+thres =  0.489
 preds_test = (pred > thres).astype(np.uint8)
 print('pred_test shape', preds_test.shape)
 

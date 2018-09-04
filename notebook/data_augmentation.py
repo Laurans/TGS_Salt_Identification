@@ -43,8 +43,8 @@ def augment_images(x_train, y_train, coverage):
             aug_img = deterministic.augment_image(x_train[i])
             label_img = deterministic.augment_image(y_train[i])
 
-            if coverage[i, 1] < 4:
-                label_img = np.expand_dims(dilation(np.squeeze(label_img), disk(2)), -1)
+            #if coverage[i, 1] < 4:
+            #    label_img = np.expand_dims(dilation(np.squeeze(label_img), disk(2)), -1)
 
             aug_imgs.append(aug_img)
             labels_imgs.append(label_img)
