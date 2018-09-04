@@ -8,7 +8,7 @@ from scipy.ndimage.filters import gaussian_filter
 from skimage.morphology import reconstruction, disk
 from skimage.filters import rank
 
-from skimage.morphology import label
+from skimage.morphology import dilation, disk, square
 from keras.applications.vgg16 import preprocess_input
 
 
@@ -28,7 +28,7 @@ def apply_features(image):
     lpb_large = get_local_binary_pattern_feat(image, 2, 16)
     return np.dstack((image, lpb_large))
 
-def augment_images(x_train, y_train):
+def augment_images(x_train, y_train, coverage):
     all_x = []
     all_y = []
 
@@ -42,6 +42,9 @@ def augment_images(x_train, y_train):
             deterministic = augmentor.to_deterministic()
             aug_img = deterministic.augment_image(x_train[i])
             label_img = deterministic.augment_image(y_train[i])
+
+            if coverage[i, 1] < 4:
+                label_img = np.expand_dims(dilation(np.squeeze(label_img), disk(2)), -1)
 
             aug_imgs.append(aug_img)
             labels_imgs.append(label_img)

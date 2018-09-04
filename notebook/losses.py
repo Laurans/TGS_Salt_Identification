@@ -13,7 +13,7 @@ def dice_loss(y_true, y_pred):
     return 1. - score
 
 def mixed_dice_bce_loss(y_true, y_pred):
-    return binary_crossentropy(y_true, y_pred)+5*dice_loss(y_true, y_pred)
+    return binary_crossentropy(y_true, y_pred)+5*dice_loss(y_true, y_pred) + focal_loss(y_true, y_pred)
 
 def focal_loss(y_true, y_pred):
     gamma = 2

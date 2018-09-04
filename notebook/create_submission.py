@@ -23,13 +23,14 @@ model = load_model('model.h5', custom_objects={
 tta_model = TTA_ModelWrapper(model)
 pred = tta_model.predict(X_test)
 
-thres =  0.57
+thres =  0.71
 preds_test = (pred > thres).astype(np.uint8)
 print('pred_test shape', preds_test.shape)
 
 pred_downsampled = datamanager.downsample(preds_test)
 
-pred_dict = {fn[:-4]:RLenc(np.round(pred_downsampled[i])) for i,fn in enumerate(tqdm(datamanager.test_ids))}
+#pred_dict = {fn[:-4]:RLenc(np.round(pred_downsampled[i])) for i,fn in enumerate(tqdm(datamanager.test_ids))}
+pred_dict = {idx[:-4]: rle_encode(np.round(pred_downsampled[i])) for i, idx in enumerate(tqdm(datamanager.test_ids))}
 
 sub = pd.DataFrame.from_dict(pred_dict,orient='index')
 sub.index.names = ['id']

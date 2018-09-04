@@ -20,8 +20,10 @@ DATA = True
 MODEL = False
 TRAIN = False
 PRED = True
+SANITY_CHECK_IOU = False
 CRF = False
 HIST = True
+
 
 datamanager = DataManager()
 
@@ -30,15 +32,14 @@ if DATA:
 
     start_time = datetime.datetime.now()
     #(x_train, y_train), (x_valid, y_valid) = datamanager.load_dataset()
-    X_train, Y_train, coverage, depths_train = datamanager.load_train()
+    X_train, Y_train, coverage, _ = datamanager.load_train()
 
-    x_train, x_valid, y_train, y_valid, ids_train, ids_valid, d_train, d_valid = train_test_split(
-        X_train, Y_train, np.array(datamanager.train_ids), depths_train, test_size=0.15, stratify=coverage[:, 1], random_state=12)
+    x_train, x_valid, y_train, y_valid, ids_train, ids_valid, cov_train, cov_valid = train_test_split(
+        X_train, Y_train, np.array(datamanager.train_ids), coverage, test_size=0.15, stratify=coverage[:, 1], random_state=12)
 
-    x_train_, y_train_ = augment_images(x_train, y_train)
-    x_valid = np.array(x_valid)
+    x_train_, y_train_ = augment_images(x_train, y_train, cov_train)
+
     y_train_ = np.piecewise(y_train_, [y_train_ > 127.5, y_train_ < 127.5], [1, 0])
-
     y_valid = np.piecewise(y_valid, [y_valid > 127.5, y_valid < 127.5], [1, 0])
 
     assert x_train_.shape[1:] == x_valid.shape[1:]
@@ -53,16 +54,23 @@ if MODEL:
 
 if PRED:
     model = load_model('model.h5', custom_objects={'mixed_dice_bce_loss': mixed_dice_bce_loss, 'dice_loss': dice_loss, 'iou_metric':iou_metric, 'focal_loss':focal_loss, 'Scale': Scale})
-    tta_model = TTA_ModelWrapper(model)
-    preds_valid = tta_model.predict(x_valid)
-    iou_best, threshold_best = best_iou_and_threshold(y_valid, preds_valid, plot=True)
-    y_pred = np.int32(preds_valid > threshold_best)
+    
+    if SANITY_CHECK_IOU:
+        preds_valid = model.predict(x_valid, verbose=1)
+        iou_best, threshold_best = best_iou_and_threshold(y_valid, preds_valid, shortcut=True)
+        print('Sanity Check, iou', iou_best)
 
-    print('plot_prediction')
-    x_valid_down = datamanager.downsample(x_valid[:,:,:, 0])
-    y_valid_down = datamanager.downsample(y_valid)
-    y_pred_down = datamanager.downsample(y_pred)
-    plot_prediction(x_valid_down, y_valid_down, y_pred_down)
+    else:
+        tta_model = TTA_ModelWrapper(model)
+        preds_valid = tta_model.predict(x_valid)
+        iou_best, threshold_best = best_iou_and_threshold(y_valid, preds_valid, plot=True)
+        y_pred = np.int32(preds_valid > threshold_best)
+
+        print('plot_prediction')
+        x_valid_down = datamanager.downsample(x_valid[:,:,:, 0])
+        y_valid_down = datamanager.downsample(y_valid)
+        y_pred_down = datamanager.downsample(y_pred)
+        plot_prediction(x_valid_down, y_valid_down, y_pred_down)
 
     if CRF:
         l=[]
@@ -79,5 +87,5 @@ if PRED:
     if HIST:
         iou_scores = plot_hist(y_valid_down, y_pred_down)
         indexes = np.array(iou_scores) < 0.4
-        plot_prediction(x_valid_down[indexes], y_valid_down[indexes], y_pred_down[indexes], fname='hard_images.png', image_id=d_valid[indexes])  
+        plot_prediction(x_valid_down[indexes], y_valid_down[indexes], y_pred_down[indexes], fname='hard_images.png', image_id=ids_valid[indexes])  
 
