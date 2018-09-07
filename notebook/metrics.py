@@ -95,6 +95,8 @@ def best_iou_and_threshold(y_true, y_pred, plot=False, shortcut=False):
 
     return iou_best, threshold_best
 
+from skimage import exposure
+
 def plot_prediction(imgs, masks, preds, fname='sanity_check_prediction.png', image_id=[]):
     max_images = 48
     grid_width = 12

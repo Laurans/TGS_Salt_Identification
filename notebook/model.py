@@ -106,72 +106,98 @@ class Scale(Layer):
         base_config = super(Scale, self).get_config()
         return dict(list(base_config.items()) + list(config.items()))
 
-def UNet(img_shape, start_ch=64, depth=4, inc_rate=2):
-    def _conv_block(m, dim):
-        eps = 1.1e-5
-        bn_axis = 3
+def UNet(img_shape, start_ch=64, depth=4, repetitions=[2, 2, 2, 2]):
+    def _residual_block(prev_layer, dim, first=False):
 
-        n = Conv2D(dim, 3, activation=None, padding='same', kernel_initializer='he_normal', kernel_regularizer=l2(1e-4))(m)
-        n = acti_layer(n, 'relu')
-        n = BatchNormalization(epsilon=eps, axis=bn_axis)(n)
-        n = Scale(axis=bn_axis)(n)
-        n = Dropout(0.5)(n)
-        n = Conv2D(dim, 3, activation=None, padding='same', kernel_initializer='he_normal', kernel_regularizer=l2(1e-4))(n)
-        n = BatchNormalization(epsilon=eps, axis=bn_axis)(n)
-        n = Scale(axis=bn_axis)(n)
-        n = acti_layer(n, 'relu')
-        se = GlobalMaxPooling2D()(n)
-        se = Dense(dim//2, activation='relu')(se)
-        se = Dense(dim, activation='sigmoid')(se)
-        n = Multiply()([n, se])
+        residual = _conv_bn_relu(prev_layer, dim, 3)
+        dropout = Dropout(0.5)(residual)
 
-        shortcut = Conv2D(dim, 1, activation=None, padding='same', kernel_initializer='he_normal', kernel_regularizer=l2(1e-4))(m)
-        shortcut = BatchNormalization(epsilon=eps, axis=bn_axis)(shortcut)
-        shortcut = Scale(axis=bn_axis)(shortcut)
+        residual = _conv_bn_relu(dropout, dim, 3)
 
-        x = Add()([n, shortcut])
-        n = acti_layer(x, 'relu')
-        
-        return n
+        sq = _squeeze(residual)
+        addition = _shortcut(prev_layer, sq)
+        return addition
 
-    def _level_block(m, dim, depth, inc):
+    def _level_block(m, dim, depth, repetitions, first=False):
         if depth > 0:
-            n = _conv_block(m, dim)
-            m = MaxPooling2D()(n)
-            m = _level_block(m, int(inc*dim), depth-1, inc)
+            n = m
+            for i in range(repetitions[-depth]):
+                n = _residual_block(n, dim, (i==0 & first))
 
-            m = Conv2DTranspose(dim, 3, strides=2, activation=None, padding='same', kernel_initializer='he_normal', kernel_regularizer=l2(1e-4))(m)
-            m = acti_layer(m, 'relu')
+            m = MaxPooling2D()(n)
+            m = _level_block(m, int(dim*2), depth-1, repetitions)
+
+            m = Conv2DTranspose(dim, 3, strides=2, padding='same', kernel_initializer='he_normal', kernel_regularizer=l2(1e-4))(m)
+            m =  ReLU()(m)
 
             n = Concatenate()([n, m])
-            m = _conv_block(n, dim)
+            m = _residual_block(n, dim)
         else:
-            m = _conv_block(m, dim)
+            m = _residual_block(m, dim)
         return m
+
+    def _conv(prev_layer, filters, kernel_size):
+        conv = Conv2D(filters, kernel_size, strides=1, padding='same', kernel_initializer='he_normal', kernel_regularizer=l2(1e-4))(prev_layer)
+        return conv
+
+    def _bn_relu(i):
+        eps = 1.1e-5
+        norm = BatchNormalization(epsilon=eps, axis=3)(i)
+        #scale = Scale(axis=3)(norm)
+        return ReLU()(norm)
+
+    def _conv_bn_relu(prev_layer, filters, kernel_size):
+        conv = _conv(prev_layer, filters, kernel_size)
+        return _bn_relu(conv)
+
+    def _bn_relu_conv(prev_layer, filters, kernel_size):
+        activation = _bn_relu(prev_layer)
+        dropout = Dropout(0.5)(activation)
+        return _conv(dropout, filters, kernel_size)
+
+    def _shortcut(x, residual):
+        input_shape = K.int_shape(x)
+        residual_shape = K.int_shape(residual)
+        stride_width = int(input_shape[2] // residual_shape[2])
+        stride_height = int(input_shape[1] // residual_shape[1])
+        equal_channes = input_shape[3] == residual_shape[3]
+        shortcut = x
+        shortcut = Conv2D(filters=residual_shape[3], kernel_size=1, strides=(stride_width, stride_height), padding='same',
+            kernel_initializer='he_normal', kernel_regularizer=l2(1e-4))(shortcut)
+        shortcut = BatchNormalization(axis=3)(shortcut)
+        #shortcut = Scale(axis=3)(shortcut)
+
+        addition = Add()([shortcut, residual])
+
+        return ReLU()(addition) 
+
+    def _squeeze(prev_layer, reduction_ratio=4):
+        prev_layer_shape = K.int_shape(prev_layer)
+        se = GlobalMaxPooling2D()(prev_layer)
+        se = Dense(prev_layer_shape[3]//reduction_ratio, activation='relu')(se)
+        se = Dense(prev_layer_shape[3], activation='sigmoid')(se)
+        return Multiply()([prev_layer, se])
 
     eps = 1.1e-5
     bn_axis = 3
 
     i = Input(shape=img_shape)
-    x = ZeroPadding2D((2,2))(i)
-    x = Conv2D(start_ch, (3, 3), strides=(1,1), padding='same', name='conv1', use_bias=False)(x)
-    x = BatchNormalization(epsilon=eps, axis=bn_axis, name='bn_conv1')(x)
-    x = Scale(axis=bn_axis, name='scale_conv1')(x)
-    x = Activation('relu', name='conv1_relu')(x)
-    
-    o = _level_block(x, start_ch, depth, inc_rate)
+    x = ZeroPadding2D(2)(i)
+    x = _conv_bn_relu(x, start_ch, 3)
+
+    o = _level_block(x, start_ch, depth, repetitions)
     o = Cropping2D(cropping=(2,2))(o)
     o = Conv2D(1, 1, activation='sigmoid')(o)
     return Model(inputs=i, outputs=o)
 
 
-def create_model(img_shape, start_ch=32, depth=0, type=0):
+def create_model(img_shape, start_ch=32, depth=0, repetitions=[]):
     K.clear_session()
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
     K.tensorflow_backend.set_session(tf.Session(config=config))
 
-    model = UNet(img_shape=img_shape, start_ch=start_ch, depth=depth)
+    model = UNet(img_shape=img_shape, start_ch=start_ch, depth=depth, repetitions=repetitions)
     model.compile(optimizer='adam', loss=mixed_dice_bce_loss)
     return model
 
@@ -214,15 +240,15 @@ class TTA_ModelWrapper():
         p1 = self.model.predict(x1, verbose=1)
         p += np.array([np.fliplr(i) for i in p1])
 
-        x1 = np.array([np.flipud(i) for i in X])
-        p1 = self.model.predict(x1, verbose=1)
-        p += np.array([np.flipud(i) for i in p1])
+        #x1 = np.array([np.flipud(i) for i in X])
+        #p1 = self.model.predict(x1, verbose=1)
+        #p += np.array([np.flipud(i) for i in p1])
 
-        x1 = np.array([np.fliplr(i) for i in x1])
-        p1 = self.model.predict(x1, verbose=1)
-        p += np.array([np.fliplr(np.flipud(i)) for i in p1])
+        #x1 = np.array([np.fliplr(i) for i in x1])
+        #p1 = self.model.predict(x1, verbose=1)
+        #p += np.array([np.fliplr(np.flipud(i)) for i in p1])
 
-        p /= 4
+        p /= 2
         return p
 
 """

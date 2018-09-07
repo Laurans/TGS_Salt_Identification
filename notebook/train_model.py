@@ -18,10 +18,11 @@ import datetime
 
 DATA = True
 MODEL = False
+LOAD_PREV_MODEL = False
 TRAIN = True
 PRED = True
 SANITY_CHECK_IOU = False
-CRF = True
+CRF = False
 HIST = True
 
 
@@ -47,8 +48,10 @@ if DATA:
     print('Loading time', time_delta)
     
 if MODEL:
-    amodel = create_model((datamanager.im_height, datamanager.im_width, datamanager.im_chan), start_ch=32, depth=5)
+    amodel = create_model((datamanager.im_height, datamanager.im_width, datamanager.im_chan), start_ch=32, depth=5, repetitions=[1, 2, 2, 2, 1])
     amodel.summary()
+    if LOAD_PREV_MODEL:
+        amodel.load_weights('model.h5')
     if TRAIN:
         history = fit(amodel, x_train_, y_train_, x_valid, y_valid, 'model.h5')
 
@@ -63,26 +66,28 @@ if PRED:
     else:
         tta_model = TTA_ModelWrapper(model)
         preds_valid = tta_model.predict(x_valid)
-        iou_best, threshold_best = best_iou_and_threshold(y_valid, preds_valid, plot=True)
-        y_pred = np.int32(preds_valid > threshold_best)
+        iou_best, threshold_best = best_iou_and_threshold(y_valid, preds_valid, shortcut=True)
+        print('TTA', iou_best)
+        y_pred = np.int32(preds_valid > 0.5)
+
+        if CRF:
+            l=[]
+            for image, mask in zip(tqdm(x_valid, desc='CRF'), y_pred):
+                crf_output = crf(image, mask)
+                l.append(crf_output)
+
+            y_pred_spe = np.array(l)
+            print('After CRF, iou:', iou_metric_batch(y_valid, y_pred_spe))
+
+            #print('plot prediction')
+            #plot_prediction(x_valid_down, y_valid_down, y_pred_down, fname='sanity_check_prediction_CRF.png')
+
 
         print('plot_prediction')
         x_valid_down = datamanager.downsample(x_valid[:,:,:, 0])
         y_valid_down = datamanager.downsample(y_valid)
         y_pred_down = datamanager.downsample(y_pred)
         plot_prediction(x_valid_down, y_valid_down, y_pred_down)
-
-        if CRF:
-            l=[]
-            for image, mask in zip(tqdm(x_valid_down, desc='CRF'), y_pred_down):
-                crf_output = crf(image, mask)
-                l.append(crf_output)
-
-            y_pred_down = np.array(l)
-            print('After CRF, iou:', iou_metric_batch(y_valid_down, y_pred_down))
-
-            print('plot prediction')
-            plot_prediction(x_valid_down, y_valid_down, y_pred_down, fname='sanity_check_prediction_CRF.png')
 
         if HIST:
             iou_scores = plot_hist(y_valid_down, y_pred_down)

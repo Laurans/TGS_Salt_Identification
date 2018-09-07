@@ -1,6 +1,8 @@
 from skimage.io import imread, imshow, concatenate_images
 from skimage.util import pad, crop
 from skimage.transform import resize
+from skimage import exposure
+
 import cv2
 from tqdm import tqdm
 import numpy as np
@@ -42,12 +44,12 @@ class DataManager:
         for n, id_ in enumerate(tqdm(self.train_ids)):
             img = load_img(self.path_train + '/images/' + id_, color_mode = "grayscale")
             x = np.squeeze(img_to_array(img))
-            x = np.expand_dims(pad(x, pad_width=self.margin, mode='symmetric'), -1) #resize(x, (self.im_height, self.im_width), mode='constant', preserve_range=True)
+            x = np.expand_dims(pad(x, pad_width=self.margin, mode='symmetric'), -1)
             X_train[n] = x
 
             mask_ori = img_to_array(load_img(self.path_train + '/masks/' + id_, color_mode = "grayscale"))
             mask = np.squeeze(mask_ori)
-            mask = np.expand_dims(pad(mask, pad_width=self.margin, mode='symmetric'), -1) #resize(mask, (self.im_height, self.im_width), mode='constant', preserve_range=True)
+            mask = np.expand_dims(pad(mask, pad_width=self.margin, mode='symmetric'), -1)
             Y_train[n] = mask
 
             coverage[n, 0] = (mask_ori / 255).sum() / self.img_size_ori**2
@@ -67,7 +69,7 @@ class DataManager:
         for n, id_ in enumerate(tqdm(self.test_ids)):
             img = load_img(self.path_test + '/images/' + id_, color_mode = "grayscale")
             x = np.squeeze(img_to_array(img))
-            x = pad(x, pad_width=self.margin, mode='symmetric') #resize(x, (self.im_height, self.im_width), mode='constant', preserve_range=True)
+            x = pad(x, pad_width=self.margin, mode='symmetric')
             X_test[n] = np.expand_dims(x, -1)
 
             test_depth[n] = self.depths[self.depths.id == id_.split('.')[0]]['z'].values[0]

@@ -6,13 +6,10 @@ from scipy import misc, ndimage
 from scipy.ndimage.interpolation import map_coordinates
 from scipy.ndimage.filters import gaussian_filter
 from skimage.morphology import reconstruction, disk
-from skimage.filters import rank
+from skimage import exposure
 
 from skimage.morphology import dilation, disk, square
 from keras.applications.vgg16 import preprocess_input
-
-
-from skimage.feature import local_binary_pattern
 
 import cv2
 import numpy as np
@@ -20,20 +17,16 @@ import numpy as np
 from tqdm import tqdm, trange
 import sys
 
-def get_local_binary_pattern_feat(image, radius, no_points):
-    lbp = local_binary_pattern(image, no_points, radius, method='uniform')
-    return lbp
-
 def apply_features(image):
-    lpb_large = get_local_binary_pattern_feat(image, 2, 16)
+    lpb_large = exposure.equalize_hist(image)
     return np.dstack((image, lpb_large))
 
 def augment_images(x_train, y_train, coverage):
     all_x = []
     all_y = []
 
-    aug_list = [iaa.Noop(), iaa.Fliplr(1), iaa.Flipud(1)]
-    aug_list.append(iaa.Sequential([iaa.Fliplr(1.0), iaa.Flipud(1.0)]))
+    aug_list = [iaa.Noop(), iaa.Fliplr(1)]#, iaa.Flipud(1)]
+    #aug_list.append(iaa.Sequential([iaa.Fliplr(1.0), iaa.Flipud(1.0)]))
     
     for augmentor in tqdm(aug_list):
         aug_imgs = []
