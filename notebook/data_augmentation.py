@@ -21,11 +21,11 @@ def apply_features(image):
     lpb_large = exposure.equalize_hist(image)
     return np.dstack((image, lpb_large))
 
-def augment_images(x_train, y_train, coverage):
+def augment_images(x_train, y_train):
     all_x = []
     all_y = []
 
-    aug_list = [iaa.Noop(), iaa.Fliplr(1)]#, iaa.Flipud(1)]
+    aug_list = [iaa.Noop(), iaa.Fliplr(1), iaa.Flipud(1)]
     #aug_list.append(iaa.Sequential([iaa.Fliplr(1.0), iaa.Flipud(1.0)]))
     
     for augmentor in tqdm(aug_list):
@@ -35,9 +35,6 @@ def augment_images(x_train, y_train, coverage):
             deterministic = augmentor.to_deterministic()
             aug_img = deterministic.augment_image(x_train[i])
             label_img = deterministic.augment_image(y_train[i])
-
-            #if coverage[i, 1] < 4:
-            #    label_img = np.expand_dims(dilation(np.squeeze(label_img), disk(2)), -1)
 
             aug_imgs.append(aug_img)
             labels_imgs.append(label_img)

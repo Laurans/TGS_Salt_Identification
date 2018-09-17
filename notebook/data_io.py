@@ -20,13 +20,13 @@ class DataManager:
 
     def __init__(self):
         # Set some parameters
-        self.im_width = 124
-        self.im_height = 124
+        self.img_size_input = 101
+        self.im_size_mask = 101
         self.im_chan = 1
         self.img_size_ori = 101
-        self.margin = [[11, 11+1], [11, 11+1]]
+        self.margin = [[13, 13+1], [13, 13+1]]
 
-        self.path_train = '../data/train/'
+        self.path_train = '../data/train_cleaned/'
         self.path_test = '../data/test/'
         self.depths = pd.read_csv('../data/depths.csv')
 
@@ -34,9 +34,9 @@ class DataManager:
         self.test_ids = next(os.walk(self.path_test+'images'))[2]
         
     def load_train(self):
-        X_train = np.zeros((len(self.train_ids), self.im_height, self.im_width, self.im_chan), dtype=np.uint8)
+        X_train = np.zeros((len(self.train_ids), self.img_size_input, self.img_size_input, self.im_chan), dtype=np.uint8)
         coverage = np.zeros((len(self.train_ids), 2), dtype=np.float32)
-        Y_train = np.zeros((len(self.train_ids), self.im_height, self.im_width, self.im_chan ), dtype=np.uint8)
+        Y_train = np.zeros((len(self.train_ids), self.im_size_mask, self.im_size_mask, self.im_chan ), dtype=np.uint8)
         train_depth = np.zeros((len(self.train_ids),))
 
         print('Getting and resizing train images and mask ...')
@@ -44,13 +44,11 @@ class DataManager:
         for n, id_ in enumerate(tqdm(self.train_ids)):
             img = load_img(self.path_train + '/images/' + id_, color_mode = "grayscale")
             x = np.squeeze(img_to_array(img))
-            x = np.expand_dims(pad(x, pad_width=self.margin, mode='symmetric'), -1)
-            X_train[n] = x
+            X_train[n] = np.expand_dims(x, -1)
 
             mask_ori = img_to_array(load_img(self.path_train + '/masks/' + id_, color_mode = "grayscale"))
             mask = np.squeeze(mask_ori)
-            mask = np.expand_dims(pad(mask, pad_width=self.margin, mode='symmetric'), -1)
-            Y_train[n] = mask
+            Y_train[n] = np.expand_dims(mask, -1)
 
             coverage[n, 0] = (mask_ori / 255).sum() / self.img_size_ori**2
             coverage[n, 1] = cov_to_class(coverage[n, 0])
@@ -59,23 +57,22 @@ class DataManager:
 
         print('Done!')
 
-        return X_train, Y_train, coverage, train_depth
+        return X_train/255, Y_train, coverage, train_depth
 
     def load_test(self):
-        X_test = np.zeros((len(self.test_ids), self.im_height, self.im_width, self.im_chan), dtype=np.uint8)
+        X_test = np.zeros((len(self.test_ids), self.img_size_input, self.img_size_input, self.im_chan), dtype=np.uint8)
         test_depth = np.zeros((len(self.test_ids,)))
         print('Getting and resizing test images ... ')
 
         for n, id_ in enumerate(tqdm(self.test_ids)):
             img = load_img(self.path_test + '/images/' + id_, color_mode = "grayscale")
             x = np.squeeze(img_to_array(img))
-            x = pad(x, pad_width=self.margin, mode='symmetric')
             X_test[n] = np.expand_dims(x, -1)
 
             test_depth[n] = self.depths[self.depths.id == id_.split('.')[0]]['z'].values[0]
 
         print('Done!')
-        return X_test, test_depth
+        return X_test/255, test_depth
 
     def downsample(self, list_img):
         def process_img(img):

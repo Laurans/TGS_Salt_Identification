@@ -17,13 +17,14 @@ from sklearn.model_selection import train_test_split
 import datetime
 
 DATA = True
-MODEL = False
+MODEL = True
 LOAD_PREV_MODEL = False
 TRAIN = True
-PRED = True
+PRED = False
 SANITY_CHECK_IOU = False
 CRF = False
 HIST = True
+PRED_ON_TRAIN = False
 
 
 datamanager = DataManager()
@@ -38,7 +39,12 @@ if DATA:
     x_train, x_valid, y_train, y_valid, ids_train, ids_valid, cov_train, cov_valid = train_test_split(
         X_train, Y_train, np.array(datamanager.train_ids), coverage, test_size=0.15, stratify=coverage[:, 1], random_state=12)
 
-    x_train_, y_train_ = augment_images(x_train, y_train, cov_train)
+    x_train_, y_train_ = augment_images(x_train, y_train)
+
+    if PRED_ON_TRAIN:
+        x_valid = x_train_
+        y_valid = y_train_
+        ids_valid = ids_train
 
     y_train_ = np.piecewise(y_train_, [y_train_ > 127.5, y_train_ < 127.5], [1, 0])
     y_valid = np.piecewise(y_valid, [y_valid > 127.5, y_valid < 127.5], [1, 0])
@@ -48,7 +54,8 @@ if DATA:
     print('Loading time', time_delta)
     
 if MODEL:
-    amodel = create_model((datamanager.im_height, datamanager.im_width, datamanager.im_chan), start_ch=32, depth=5, repetitions=[1, 2, 2, 2, 1])
+    amodel = create_model((datamanager.img_size_input, datamanager.img_size_input, datamanager.im_chan), start_ch=32, depth=5, repetitions=[1, 1, 1, 1, 1],
+    filter_sizes=[3, 3, 3, 3, 3])
     amodel.summary()
     if LOAD_PREV_MODEL:
         amodel.load_weights('model.h5')
@@ -84,9 +91,9 @@ if PRED:
 
 
         print('plot_prediction')
-        x_valid_down = datamanager.downsample(x_valid[:,:,:, 0])
-        y_valid_down = datamanager.downsample(y_valid)
-        y_pred_down = datamanager.downsample(y_pred)
+        x_valid_down = x_valid[:,:,:, 0]
+        y_valid_down = y_valid
+        y_pred_down = y_pred
         plot_prediction(x_valid_down, y_valid_down, y_pred_down)
 
         if HIST:
