@@ -92,7 +92,11 @@ if MODEL:
         xv = xv.reshape(xv.shape[0], -1, 1)
 
         stack_model = stacking(xt.shape[1:], len(a))
-        fit(stack_model, xt, y_train_, xv, y_valid, 'stacking.h5', False, 'mixed')
+        fit(stack_model, xt, y_train_, xv, y_valid, 'stacking.h5', False, 'mixed3')
+        
+        preds_valid = stack_model.predict(xv)
+        iou_best, threshold_best = best_iou_and_threshold(y_valid, preds_valid, shortcut=False)
+        print('IOU best', iou_best, threshold_best)
 
 if PRED:
     model = load_model('model.h5', custom_objects={'mixed_dice_bce_loss': mixed_dice_bce_loss, 'dice_loss': dice_loss, 'iou_metric':iou_metric, 'focal_loss':focal_loss, 'Scale': Scale})

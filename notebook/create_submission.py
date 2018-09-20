@@ -37,10 +37,10 @@ for name in list_models:
 x = np.dstack(x)
 x = x.reshape(x.shape[0], -1, 1)
 model = load_model('stacking.h5', custom_objects=custom_objects)
-pred = model.predict(x)
+pred = model.predict(x, verbose=1)
 
 #pred = p/len(list_models)
-thres =  0.5
+thres =  0.67
 preds_test = (pred > thres).astype(np.uint8)
 print('pred_test shape', preds_test.shape)
 
