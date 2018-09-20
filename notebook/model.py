@@ -33,11 +33,12 @@ class ValGlobalMetrics(Callback):
         predict = np.asarray(self.model.predict(self.x_valid))
         best_iou, _ = best_iou_and_threshold(y_true=self.y_valid, y_pred=predict, shortcut=True)
         logs['val_best_iou'] = best_iou
-        print(' - val_best_iou: {}'.format(best_iou))
+        logs['fill_requirement'] = best_iou >= 0.84
+        print(' - val_best_iou: {}  fill_requirement {}'.format(best_iou, best_iou >= 0.84))
 
 # Model
 
-def UNet(img_shape, start_ch=64, depth=4, repetitions=[2, 2, 2, 2], filter_size=[3, 3, 3, 3]):
+def UNet(img_shape):
     
     def _conv(prev_layer, filters, kernel_size, strides=1):
         conv = Conv2D(filters, kernel_size, strides=strides, padding='same', kernel_initializer='he_normal', kernel_regularizer=l2(1e-4))(prev_layer)
@@ -70,10 +71,9 @@ def UNet(img_shape, start_ch=64, depth=4, repetitions=[2, 2, 2, 2], filter_size=
         x = ReLU()(x)
         return x
 
-    def _level_block(encoder, dim, depth,):
+    def _level_block(encoder, dim, depth):
         print(depth, encoder.shape)
         if depth > 0:
-
             encoder = _encoder_block(encoder, dim)
 
             downsampler = MaxPooling2D((2, 2))(encoder)
@@ -120,27 +120,53 @@ def UNet(img_shape, start_ch=64, depth=4, repetitions=[2, 2, 2, 2], filter_size=
 
     i = Input(shape=img_shape)
 
-    c = _level_block(i, start_ch, depth)
+    c = _level_block(i, 32, 5)
 
     o = Dropout(0.25)(c)
     o = Conv2D(1, 1, activation='sigmoid', padding='same')(o)
     return Model(inputs=i, outputs=o)
 
+def stacking(input_shape, strides):
+    i = Input(shape=input_shape)
 
-def create_model(img_shape, start_ch=32, depth=0, repetitions=[], filter_sizes=[]):
+    c = Conv1D(1, kernel_size=strides, strides=strides,  activation='sigmoid')(i)
+    c = Reshape((101, 101))(c)
+    m = Model(i, c)
+    m.summary()
+    return m
+
+def create_model(img_shape):
     K.clear_session()
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
     K.tensorflow_backend.set_session(tf.Session(config=config))
 
-    model = UNet(img_shape=img_shape, start_ch=start_ch, depth=depth, repetitions=repetitions, filter_size=filter_sizes)
-    model.compile(optimizer='adam', loss=mixed_dice_bce_loss)
+    model = UNet(img_shape=img_shape)
+    #model.compile(optimizer=Adam(), loss=mixed_dice_bce_loss)
     return model
 
 
-def fit(model, X_train, Y_train, x_valid, y_valid, output_name):
+def fit(model, X_train, Y_train, x_valid, y_valid, output_name, finetune=False, loss_str='mixed'):
+
+    if finetune:
+        lr = 0.00005
+    else:
+        lr = 0.001
+
+    metric = ValGlobalMetrics(x_valid, y_valid)
+
+    if loss_str == 'mixed':
+        loss = mixed_dice_bce_loss
+    elif loss_str == 'mixed2':
+        loss = mixed_dice_bce_loss_masked
+    elif loss_str == 'mixed3':
+        loss = mixed_bce_lovasz
+    elif loss_str == 'lovasz':
+        loss = lovasz_loss
+
+    model.compile(optimizer=Adam(lr), loss=mixed_dice_bce_loss)
     early_stopping = EarlyStopping(
-        patience=20, verbose=1)
+        patience=20, verbose=1, monitor='val_best_iou', mode='max')
 
     checkpointer = ModelCheckpoint(
         output_name, save_best_only=True, verbose=1, monitor='val_best_iou', mode='max')
@@ -149,8 +175,8 @@ def fit(model, X_train, Y_train, x_valid, y_valid, output_name):
         factor=0.7, patience=5, verbose=1, monitor='val_best_iou', mode='max')
     csvlog = CSVLogger('{}_log.csv'.format(output_name.split('.')[0]))
 
-    results = model.fit(X_train, Y_train, validation_data=[x_valid, y_valid], batch_size=32, epochs=200,
-                        callbacks=[ValGlobalMetrics(x_valid, y_valid), checkpointer, reduce_lr, csvlog, early_stopping], verbose=1, shuffle=True)
+    results = model.fit(X_train, Y_train, validation_data=[x_valid, y_valid], batch_size=32, epochs=300,
+                        callbacks=[metric, checkpointer, reduce_lr, csvlog, early_stopping], verbose=1, shuffle=True)
     return results
 
 
@@ -176,15 +202,7 @@ class TTA_ModelWrapper():
         p1 = self.model.predict(x1, verbose=1)
         p += np.array([np.fliplr(i) for i in p1])
 
-        x1 = np.array([np.flipud(i) for i in X])
-        p1 = self.model.predict(x1, verbose=1)
-        p += np.array([np.flipud(i) for i in p1])
-
-        #x1 = np.array([np.fliplr(i) for i in x1])
-        #p1 = self.model.predict(x1, verbose=1)
-        #p += np.array([np.fliplr(np.flipud(i)) for i in p1])
-
-        p /= 3
+        p /= 2
         return p
 
 """

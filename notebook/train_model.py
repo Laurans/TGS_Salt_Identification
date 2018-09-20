@@ -19,13 +19,13 @@ import datetime
 DATA = True
 MODEL = True
 LOAD_PREV_MODEL = False
-TRAIN = True
+TRAIN = False
+TRAIN_STACKING = True
 PRED = False
 SANITY_CHECK_IOU = False
 CRF = False
 HIST = True
 PRED_ON_TRAIN = False
-
 
 datamanager = DataManager()
 
@@ -37,7 +37,7 @@ if DATA:
     X_train, Y_train, coverage, _ = datamanager.load_train()
 
     x_train, x_valid, y_train, y_valid, ids_train, ids_valid, cov_train, cov_valid = train_test_split(
-        X_train, Y_train, np.array(datamanager.train_ids), coverage, test_size=0.15, stratify=coverage[:, 1], random_state=12)
+        X_train, Y_train, np.array(datamanager.train_ids), coverage, test_size=0.08, stratify=coverage[:, 1], random_state=12)
 
     x_train_, y_train_ = augment_images(x_train, y_train)
 
@@ -54,13 +54,45 @@ if DATA:
     print('Loading time', time_delta)
     
 if MODEL:
-    amodel = create_model((datamanager.img_size_input, datamanager.img_size_input, datamanager.im_chan), start_ch=32, depth=5, repetitions=[1, 1, 1, 1, 1],
-    filter_sizes=[3, 3, 3, 3, 3])
+    amodel = create_model((datamanager.img_size_input, datamanager.img_size_input, datamanager.im_chan))
     amodel.summary()
     if LOAD_PREV_MODEL:
+        print('Loading weights')
         amodel.load_weights('model.h5')
     if TRAIN:
-        history = fit(amodel, x_train_, y_train_, x_valid, y_valid, 'model.h5')
+        print('Start training')
+        for i, finetune, loss in zip(range(1, 5), [False, True, True, True], ['mixed3', 'mixed2', 'mixed', 'lovasz']):
+            fit(amodel, x_train_, y_train_, x_valid, y_valid, 'model_{}.h5'.format(i), finetune, loss)
+
+    if TRAIN_STACKING:
+        a = []
+        b = []
+        for i in range(1, 5):
+            model = load_model('model_{}.h5'.format(i), 
+            custom_objects={
+                'mixed_dice_bce_loss': mixed_dice_bce_loss, 
+                'dice_loss': dice_loss, 
+                'iou_metric':iou_metric, 
+                'focal_loss':focal_loss,
+                'mixed_dice_bce_loss_masked': mixed_dice_bce_loss_masked,
+                'lovasz_loss': lovasz_loss,
+                'mixed_bce_lovasz': mixed_bce_lovasz,
+                })
+            tta_model = TTA_ModelWrapper(model)
+            pred = tta_model.predict(x_train_)
+            pred = pred.reshape(pred.shape[0], -1)
+            a.append(pred)
+            pred = tta_model.predict(x_valid)
+            pred = pred.reshape(pred.shape[0], -1)
+            b.append(pred)
+
+        xt = np.dstack(a)
+        xt = xt.reshape(xt.shape[0], -1, 1)
+        xv = np.dstack(b)
+        xv = xv.reshape(xv.shape[0], -1, 1)
+
+        stack_model = stacking(xt.shape[1:], len(a))
+        fit(stack_model, xt, y_train_, xv, y_valid, 'stacking.h5', False, 'mixed')
 
 if PRED:
     model = load_model('model.h5', custom_objects={'mixed_dice_bce_loss': mixed_dice_bce_loss, 'dice_loss': dice_loss, 'iou_metric':iou_metric, 'focal_loss':focal_loss, 'Scale': Scale})

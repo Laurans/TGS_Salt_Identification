@@ -10,19 +10,36 @@ import numpy as np
 import keras.backend as K
 import joblib
 
+
+custom_objects={
+        'mixed_dice_bce_loss': mixed_dice_bce_loss, 
+        'dice_loss': dice_loss, 
+        'iou_metric':iou_metric, 
+        'focal_loss':focal_loss,
+        'mixed_dice_bce_loss_masked': mixed_dice_bce_loss_masked,
+        'lovasz_loss': lovasz_loss,
+        'mixed_bce_lovasz': mixed_bce_lovasz,
+        }
 datamanager = DataManager()
 
 X_test, _ = datamanager.load_test()
 
-model = load_model('model.h5', custom_objects={
-    'mixed_dice_bce_loss': mixed_dice_bce_loss, 
-    'dice_loss': dice_loss, 
-    'iou_metric':iou_metric, 
-    'focal_loss':focal_loss,
-    })
-tta_model = TTA_ModelWrapper(model)
-pred = tta_model.predict(X_test)
+x = []
 
+list_models = ['model_1.h5','model_2.h5', 'model_3.h5', 'model_4.h5']
+for name in list_models:
+    model = load_model(name, custom_objects=custom_objects)
+    tta_model = TTA_ModelWrapper(model)
+    pred = tta_model.predict(X_test)
+    pred = pred.reshape(pred.shape[0], -1)
+    x.append(pred)
+
+x = np.dstack(x)
+x = x.reshape(x.shape[0], -1, 1)
+model = load_model('stacking.h5', custom_objects=custom_objects)
+pred = model.predict(x)
+
+#pred = p/len(list_models)
 thres =  0.5
 preds_test = (pred > thres).astype(np.uint8)
 print('pred_test shape', preds_test.shape)
