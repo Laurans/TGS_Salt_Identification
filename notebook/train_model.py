@@ -26,6 +26,8 @@ SANITY_CHECK_IOU = False
 CRF = False
 HIST = True
 PRED_ON_TRAIN = False
+RANDOM_STATE = [12, 22, 32, 42, 52]
+FOLD_NUMBER = 2
 
 datamanager = DataManager()
 
@@ -33,11 +35,10 @@ if DATA:
     print('Loading dataset')
 
     start_time = datetime.datetime.now()
-    #(x_train, y_train), (x_valid, y_valid) = datamanager.load_dataset()
-    X_train, Y_train, coverage, _ = datamanager.load_train()
+    X_train, Y_train, coverage = datamanager.load_train()
 
-    x_train, x_valid, y_train, y_valid, ids_train, ids_valid, cov_train, cov_valid = train_test_split(
-        X_train, Y_train, np.array(datamanager.train_ids), coverage, test_size=0.08, stratify=coverage[:, 1], random_state=12)
+    x_train, x_valid, y_train, y_valid, ids_train, ids_valid = train_test_split(
+        X_train, Y_train, np.array(datamanager.train_ids), test_size=0.08, stratify=coverage[:, 1], random_state=RANDOM_STATE[FOLD_NUMBER])
 
     x_train_, y_train_ = augment_images(x_train, y_train)
 
@@ -55,20 +56,26 @@ if DATA:
     
 if MODEL:
     amodel = create_model((datamanager.img_size_input, datamanager.img_size_input, datamanager.im_chan))
-    amodel.summary()
     if LOAD_PREV_MODEL:
         print('Loading weights')
-        amodel.load_weights('model.h5')
+        amodel.load_weights('base_model.h5')
     if TRAIN:
         print('Start training')
-        for i, finetune, loss in zip(range(1, 5), [False, True, True, True], ['mixed3', 'mixed2', 'mixed', 'lovasz']):
-            fit(amodel, x_train_, y_train_, x_valid, y_valid, 'model_{}.h5'.format(i), finetune, loss)
+        #
+        if FOLD_NUMBER > 0:
+            for i, loss, epochs in zip(range(1, 7),
+                                    ['mixed3', 'lovasz', 'lovasz', 'lovasz', 'lovasz', 'lovasz'], 
+                                    [300, 300, 50, 50, 50, 50]):
+                fit(amodel, x_train_, y_train_, x_valid, y_valid, 'fold_{}_model_{}.h5'.format(FOLD_NUMBER, i), True, loss, epochs)
+        else:
+            fit(amodel, x_train_, y_train_, x_valid, y_valid, 'new_base_model.h5', False, 'mixed3')
+
 
     if TRAIN_STACKING:
         a = []
         b = []
-        for i in range(1, 5):
-            model = load_model('model_{}.h5'.format(i), 
+        for i in range(1, 7):
+            model = load_model('fold_{}_model_{}.h5'.format(FOLD_NUMBER, i), 
             custom_objects={
                 'mixed_dice_bce_loss': mixed_dice_bce_loss, 
                 'dice_loss': dice_loss, 
@@ -92,7 +99,7 @@ if MODEL:
         xv = xv.reshape(xv.shape[0], -1, 1)
 
         stack_model = stacking(xt.shape[1:], len(a))
-        fit(stack_model, xt, y_train_, xv, y_valid, 'stacking.h5', False, 'mixed3')
+        fit(stack_model, xt, y_train_, xv, y_valid, 'fold_{}_stacking.h5'.format(FOLD_NUMBER), False, 'mixed3')
         
         preds_valid = stack_model.predict(xv)
         iou_best, threshold_best = best_iou_and_threshold(y_valid, preds_valid, shortcut=False)

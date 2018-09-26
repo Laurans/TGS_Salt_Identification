@@ -18,6 +18,7 @@ from keras import backend as K
 from keras.applications.vgg16 import VGG16, preprocess_input
 from keras.losses import binary_crossentropy
 from keras.optimizers import Adam
+from sklearn.metrics import accuracy_score
 from keras import regularizers
 from metrics import best_iou_and_threshold
 from keras.regularizers import l2
@@ -28,13 +29,15 @@ class ValGlobalMetrics(Callback):
     def __init__(self, x_valid, y_valid):
         self.x_valid = x_valid
         self.y_valid = y_valid
+        self.threshold = 0.85
 
     def on_epoch_end(self, batch, logs={}):
-        predict = np.asarray(self.model.predict(self.x_valid))
+        predict = self.model.predict(self.x_valid)
+        predict = np.asarray(predict)
         best_iou, _ = best_iou_and_threshold(y_true=self.y_valid, y_pred=predict, shortcut=True)
         logs['val_best_iou'] = best_iou
-        logs['fill_requirement'] = best_iou >= 0.84
-        print(' - val_best_iou: {}  fill_requirement {}'.format(best_iou, best_iou >= 0.84))
+        logs['fill_requirement'] = logs['val_best_iou'] >= self.threshold
+        print(' - val_best_iou: {}  fill_requirement {}'.format(logs['val_best_iou'], logs['fill_requirement']))
 
 # Model
 
@@ -79,7 +82,7 @@ def UNet(img_shape):
             downsampler = MaxPooling2D((2, 2))(encoder)
             downsampler = Dropout(0.25)(downsampler)
 
-            level = _level_block(downsampler, int(dim*2), depth-1)
+            level, middle = _level_block(downsampler, int(dim*2), depth-1)
 
             if encoder.shape[1] in [25, 101]:
                 padding = 'valid'
@@ -92,21 +95,8 @@ def UNet(img_shape):
             decoder = _encoder_block(decoder, dim)
         else:
             decoder = _encoder_block(encoder, dim)
-        return decoder
-
-    def _shortcut(x, residual):
-        input_shape = K.int_shape(x)
-        residual_shape = K.int_shape(residual)
-        stride_width = int(input_shape[2] // residual_shape[2])
-        stride_height = int(input_shape[1] // residual_shape[1])
-        equal_channes = input_shape[3] == residual_shape[3]
-        shortcut = x
-        shortcut = Conv2D(filters=residual_shape[3], kernel_size=1, strides=(stride_width, stride_height), padding='same',
-            kernel_initializer='he_normal', kernel_regularizer=l2(1e-4))(shortcut)
-        shortcut = BatchNormalization(axis=3)(shortcut)
-        addition = Add()([shortcut, residual])
-
-        return ReLU()(addition) 
+            middle = encoder
+        return decoder, middle
 
     def _squeeze(prev_layer, reduction_ratio=4):
         prev_layer_shape = K.int_shape(prev_layer)
@@ -120,10 +110,11 @@ def UNet(img_shape):
 
     i = Input(shape=img_shape)
 
-    c = _level_block(i, 32, 5)
+    c, m = _level_block(i, 32, 5)
 
-    o = Dropout(0.25)(c)
-    o = Conv2D(1, 1, activation='sigmoid', padding='same')(o)
+    c = Dropout(0.25)(c)
+    c = _conv(c, 1, 1)
+    o = Activation('sigmoid', name='segmentation')(c)
     return Model(inputs=i, outputs=o)
 
 def stacking(input_shape, strides):
@@ -142,14 +133,13 @@ def create_model(img_shape):
     K.tensorflow_backend.set_session(tf.Session(config=config))
 
     model = UNet(img_shape=img_shape)
-    #model.compile(optimizer=Adam(), loss=mixed_dice_bce_loss)
     return model
 
 
-def fit(model, X_train, Y_train, x_valid, y_valid, output_name, finetune=False, loss_str='mixed'):
+def fit(model, X_train, Y_train, x_valid, y_valid, output_name, finetune=False, loss_str='mixed', epochs=300):
 
     if finetune:
-        lr = 0.00005
+        lr = 0.0001
     else:
         lr = 0.001
 
@@ -160,8 +150,10 @@ def fit(model, X_train, Y_train, x_valid, y_valid, output_name, finetune=False, 
     elif loss_str == 'mixed2':
         loss = mixed_dice_bce_loss_masked
     elif loss_str == 'mixed3':
+        print('MIXED BCE LOVASZ')
         loss = mixed_bce_lovasz
     elif loss_str == 'lovasz':
+        print('LOVASZ')
         loss = lovasz_loss
 
     model.compile(optimizer=Adam(lr), loss=mixed_dice_bce_loss)
@@ -175,7 +167,7 @@ def fit(model, X_train, Y_train, x_valid, y_valid, output_name, finetune=False, 
         factor=0.7, patience=5, verbose=1, monitor='val_best_iou', mode='max')
     csvlog = CSVLogger('{}_log.csv'.format(output_name.split('.')[0]))
 
-    results = model.fit(X_train, Y_train, validation_data=[x_valid, y_valid], batch_size=32, epochs=300,
+    results = model.fit(X_train, Y_train, validation_data=[x_valid, y_valid], batch_size=32, epochs=epochs,
                         callbacks=[metric, checkpointer, reduce_lr, csvlog, early_stopping], verbose=1, shuffle=True)
     return results
 

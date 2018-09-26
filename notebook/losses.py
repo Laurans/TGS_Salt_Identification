@@ -31,7 +31,12 @@ def mixed_dice_bce_loss_masked(y_true, y_pred):
     return noMaskLoss + hasMaskLoss
 
 def mixed_bce_lovasz(y_true, y_pred):
-    return binary_crossentropy(y_true, y_pred) + lovasz_loss(y_true, y_pred)
+    segmentation_loss = binary_crossentropy(y_true, y_pred) + _lovasz_loss(y_true, y_pred)
+    return segmentation_loss
+
+def lovasz_loss(y_true, y_pred):
+    segmentation_loss = _lovasz_loss(y_true, y_pred)
+    return segmentation_loss
 
 def focal_loss(y_true, y_pred):
     gamma = 2
@@ -120,7 +125,7 @@ def flatten_binary_scores(scores, labels, ignore=None):
     vlabels = tf.boolean_mask(labels, valid, name='valid_labels')
     return vscores, vlabels
 
-def lovasz_loss(y_true, y_pred):
+def _lovasz_loss(y_true, y_pred):
     y_true, y_pred = K.cast(K.squeeze(y_true, -1), 'int32'), K.cast(K.squeeze(y_pred, -1), 'float32')
     logits = K.log(y_pred / (1. - y_pred))
     #logits = y_pred #Jiaxin

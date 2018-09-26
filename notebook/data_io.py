@@ -26,18 +26,26 @@ class DataManager:
         self.img_size_ori = 101
         self.margin = [[13, 13+1], [13, 13+1]]
 
-        self.path_train = '../data/train_cleaned/'
+        self.path_train = '../data/train/'
         self.path_test = '../data/test/'
         self.depths = pd.read_csv('../data/depths.csv')
+        self.train_csv = pd.read_csv('../data/train.csv')
+        
+        self.train_csv.fillna('', inplace=True)
+        self.train_csv['vertical'] = 0
+
+        for index, row in self.train_csv.iterrows():
+            encoded_mask = row['rle_mask'].split(' ')
+            if len(encoded_mask) > 1 and len(encoded_mask) < 5 and int(encoded_mask[1]) % 101 == 0:
+                self.train_csv.loc[index, 'vertical'] = 1
 
         self.train_ids = next(os.walk(self.path_train+"images"))[2]
         self.test_ids = next(os.walk(self.path_test+'images'))[2]
         
     def load_train(self):
         X_train = np.zeros((len(self.train_ids), self.img_size_input, self.img_size_input, self.im_chan), dtype=np.uint8)
-        coverage = np.zeros((len(self.train_ids), 2), dtype=np.float32)
+        coverage = np.zeros((len(self.train_ids), 3), dtype=np.float32)
         Y_train = np.zeros((len(self.train_ids), self.im_size_mask, self.im_size_mask, self.im_chan ), dtype=np.uint8)
-        train_depth = np.zeros((len(self.train_ids),))
 
         print('Getting and resizing train images and mask ...')
 
@@ -52,16 +60,15 @@ class DataManager:
 
             coverage[n, 0] = (mask_ori / 255).sum() / self.img_size_ori**2
             coverage[n, 1] = cov_to_class(coverage[n, 0])
-
-            train_depth[n] = self.depths[self.depths.id == id_.split('.')[0]]['z'].values[0]
+            
+            id_img = id_.split('.')[0]
+            coverage[n, 2] = self.train_csv[self.train_csv.id == id_img]['vertical'].values[0] 
 
         print('Done!')
-
-        return X_train/255, Y_train, coverage, train_depth
+        return X_train/255, Y_train, coverage
 
     def load_test(self):
         X_test = np.zeros((len(self.test_ids), self.img_size_input, self.img_size_input, self.im_chan), dtype=np.uint8)
-        test_depth = np.zeros((len(self.test_ids,)))
         print('Getting and resizing test images ... ')
 
         for n, id_ in enumerate(tqdm(self.test_ids)):
@@ -69,10 +76,8 @@ class DataManager:
             x = np.squeeze(img_to_array(img))
             X_test[n] = np.expand_dims(x, -1)
 
-            test_depth[n] = self.depths[self.depths.id == id_.split('.')[0]]['z'].values[0]
-
         print('Done!')
-        return X_test/255, test_depth
+        return X_test/255
 
     def downsample(self, list_img):
         def process_img(img):

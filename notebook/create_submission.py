@@ -9,7 +9,7 @@ from tqdm import tqdm
 import numpy as np
 import keras.backend as K
 import joblib
-
+import os
 
 custom_objects={
         'mixed_dice_bce_loss': mixed_dice_bce_loss, 
@@ -22,25 +22,55 @@ custom_objects={
         }
 datamanager = DataManager()
 
-X_test, _ = datamanager.load_test()
+def prepare_prediction_from_unet(fold, interval, flat):
+    list_models = ['fold_{}_model_{}.h5'.format(fold, i) for i in interval]
 
-x = []
+    X_test = datamanager.load_test()
+    for name in list_models:
+        model = load_model(name, custom_objects=custom_objects)
+        tta_model = TTA_ModelWrapper(model)
+        pred = tta_model.predict(X_test)
+        if flat:
+            pred = pred.reshape(pred.shape[0], -1)
 
-list_models = ['model_1.h5','model_2.h5', 'model_3.h5', 'model_4.h5']
-for name in list_models:
-    model = load_model(name, custom_objects=custom_objects)
-    tta_model = TTA_ModelWrapper(model)
-    pred = tta_model.predict(X_test)
-    pred = pred.reshape(pred.shape[0], -1)
-    x.append(pred)
+        for a in range(0, pred.shape[0], 500):
+            start = a
+            end = a+500
+            if not os.path.exists('../data/prediction/fold_{}'.format(fold)): # dont exist create
+                os.mkdir('../data/prediction/fold_{}'.format(fold))
+            
+            if not os.path.exists('../data/prediction/fold_{}/part_{}'.format(fold, start)):
+                os.mkdir('../data/prediction/fold_{}/part_{}'.format(fold, start))
 
-x = np.dstack(x)
-x = x.reshape(x.shape[0], -1, 1)
-model = load_model('stacking.h5', custom_objects=custom_objects)
-pred = model.predict(x, verbose=1)
+            joblib.dump(pred[start:end], '../data/prediction/fold_{}/part_{}/{}.pkl'.format(fold, start, name))
 
-#pred = p/len(list_models)
-thres =  0.67
+def generator_unet(fold, max_models):
+    nb_parts = len(os.listdir('../data/prediction/fold_{}/'.format(fold)))
+    part = 0
+    while part < nb_parts * 500:
+        path = '../data/prediction/fold_{}/part_{}/'.format(fold, part)
+        file_list = os.listdir(path)
+
+        assert len(file_list) == max_models
+        x = []
+        for name in tqdm(file_list, disable=True):
+            pred = joblib.load(path+name)
+            x.append(pred)
+        x = np.dstack(x)
+        x = x.reshape(x.shape[0], -1, 1)
+        yield x
+        part += 500 
+
+def get_stacking_pred(fold, max_models):
+    nb_parts = len(os.listdir('../data/prediction/fold_{}/'.format(fold)))
+
+    model = load_model('fold_{}_stacking.h5'.format(fold), custom_objects=custom_objects)
+    pred = model.predict_generator(generator_unet(fold, max_models), steps=nb_parts, verbose=1)
+    return pred
+
+#prepare_prediction_from_unet(1, range(1, 7), True)
+pred = get_stacking_pred(1, 6)
+thres =  0.50
 preds_test = (pred > thres).astype(np.uint8)
 print('pred_test shape', preds_test.shape)
 

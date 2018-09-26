@@ -17,16 +17,26 @@ import numpy as np
 from tqdm import tqdm, trange
 import sys
 
-def apply_features(image):
-    lpb_large = exposure.equalize_hist(image)
-    return np.dstack((image, lpb_large))
+def get_classes(x):
+    all_cov = []
+    for i in trange(x.shape[0]):
+        cov_img = np.sum(x[i]/255)
+        if cov_img == 1:
+            all_cov.append([0, 0, 1])
+        elif cov_img == 0:
+            all_cov.append([1, 0, 0])
+        else:
+            all_cov.append([0, 1, 0])
+    
+    return np.array(all_cov)
 
 def augment_images(x_train, y_train):
     all_x = []
     all_y = []
 
-    aug_list = [iaa.Noop(), iaa.Fliplr(1)]#, iaa.Flipud(1)]
-    #aug_list.append(iaa.Sequential([iaa.Fliplr(1.0), iaa.Flipud(1.0)]))
+    aug_list = [iaa.Noop(), iaa.Fliplr(1)] # Good
+    aug_list.append(iaa.Affine(translate_percent={"x": (-0.2, 0.2), "y": (-0.2, 0.2)}, mode='reflect')) # Good
+    aug_list.append(iaa.Sequential([iaa.Fliplr(1), iaa.Affine(translate_percent={"x": (-0.2, 0.2), "y": (-0.2, 0.2)}, mode='reflect')])) # Good
     
     for augmentor in tqdm(aug_list):
         aug_imgs = []
