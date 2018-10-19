@@ -1,6 +1,0 @@
-start,depth,residual,maxpool,upconv,aug_noise,aug_contrast,seed,VGGUnet,gaus_noise
-32,5,False,True,True,False,False,12,False,False.
-32,5,False,True,True,True,False,22,False,False
-32,5,False,True,True,False,True,17,False,False.
-32,5,False,True,True,True,True,27,False,False.
-32,5,False,True,True,False,False,13,False,True
