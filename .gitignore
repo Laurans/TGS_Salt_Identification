@@ -135,3 +135,4 @@ pip-selfcheck.json
 data/
 *.h5
 .Trash-0/
+.vscode
