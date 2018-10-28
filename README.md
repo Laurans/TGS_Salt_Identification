@@ -1,4 +1,6 @@
-# TGS Salt Identification [Kaggle Competition]
+# TGS Salt Identification Challenge [Kaggle Competition]
+
+[Link to the competition](https://www.kaggle.com/c/tgs-salt-identification-challenge)
 
 ## Installation
 ### Requirements
